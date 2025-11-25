@@ -14,6 +14,8 @@ namespace StickyNoteApp
         [STAThread]
         static void Main()
         {
+            Database.Initialize(); // データベース初期化
+
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             Application.Run(new NewForm());

@@ -52,7 +52,7 @@ namespace StickyNoteApp
             this.titleBar.Dock = System.Windows.Forms.DockStyle.Top;
             this.titleBar.Height = 40;
             this.titleBar.AutoSize = false;
-
+            // タイトルバーのマウスイベントにフォーム移動処理を割り当て
             this.titleBar.MouseDown += new System.Windows.Forms.MouseEventHandler(this.MoveForm_MouseDown);
             this.titleBar.MouseMove += new System.Windows.Forms.MouseEventHandler(this.MoveForm_MouseMove);
             this.titleBar.MouseUp += new System.Windows.Forms.MouseEventHandler(this.MoveForm_MouseUp);
@@ -103,7 +103,7 @@ namespace StickyNoteApp
         #endregion
         private System.Windows.Forms.Panel titleBar;
         private System.Windows.Forms.Button btnClose;
-        private System.Windows.Forms.TextBox txtNote;
+        public System.Windows.Forms.TextBox txtNote; // ← publicに変更
         private System.Windows.Forms.ContextMenuStrip contextMenu;
         private System.Windows.Forms.ToolStripMenuItem deleteMenuItem;
     }

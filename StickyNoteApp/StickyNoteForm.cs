@@ -11,10 +11,58 @@ namespace StickyNoteApp
     {
         private bool dragging = false;
         private Point dragStart;
+        private Timer autoSaveTimer;
+        private bool needsSave = false;
+
+        public string NoteId { get; set; } = Guid.NewGuid().ToString();
+        public string CreatedAt { get; set; } = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
 
         public StickyNoteForm()
         {
             InitializeComponent();
+            InitializeAutoSave();
+
+            System.Diagnostics.Debug.WriteLine($"付箋作成: ID={NoteId}");
+        }
+
+        /// <summary>
+        /// 自動保存タイマーの初期化
+        /// </summary>
+        private void InitializeAutoSave()
+        {
+            // タイマー設定
+            autoSaveTimer = new Timer();
+            autoSaveTimer.Interval = 1000; // 1秒ごと
+            autoSaveTimer.Tick += AutoSaveTimer_Tick;
+            autoSaveTimer.Start();
+
+            // イベントハンドラー登録
+            this.txtNote.TextChanged += OnContentChanged;
+            this.LocationChanged += OnContentChanged;
+            this.SizeChanged += OnContentChanged;
+            this.BackColorChanged += OnContentChanged;
+        }
+
+        /// <summary>
+        /// 内容変更時の処理
+        /// </summary>
+        private void OnContentChanged(object sender, EventArgs e)
+        {
+            needsSave = true;
+            System.Diagnostics.Debug.WriteLine($"[{NoteId}] 変更検出");
+        }
+
+        /// <summary>
+        /// 自動保存タイマーのティック処理
+        /// </summary>
+        private void AutoSaveTimer_Tick(object sender, EventArgs e)
+        {
+            if (needsSave)
+            {
+                System.Diagnostics.Debug.WriteLine($"[{NoteId}] 自動保存実行中...");
+                SaveNote();
+                needsSave = false;
+            }
         }
 
         /// <summary>
@@ -45,7 +93,12 @@ namespace StickyNoteApp
         /// </summary>
         private void MoveForm_MouseUp(object sender, MouseEventArgs e)
         {
-            dragging = false;
+            if (dragging)
+            {
+                dragging = false;
+                needsSave = true;
+                System.Diagnostics.Debug.WriteLine($"[{NoteId}] ドラッグ終了");
+            }
         }
 
         /// <summary>
@@ -55,6 +108,8 @@ namespace StickyNoteApp
         {
             if (MessageBox.Show("この付箋を削除しますか？", "確認", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
             {
+                System.Diagnostics.Debug.WriteLine($"[{NoteId}] 削除実行");
+                Database.SoftDelete(NoteId);
                 this.Close();
             }
         }
@@ -66,7 +121,68 @@ namespace StickyNoteApp
         {
             if (MessageBox.Show("この付箋を削除しますか？", "確認", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
             {
+                System.Diagnostics.Debug.WriteLine($"[{NoteId}] 削除実行");
+                Database.SoftDelete(NoteId);
                 this.Close();
+            }
+        }
+
+        /// <summary>
+        /// テキストを設定（復元時用）
+        /// </summary>
+        public void SetText(string text)
+        {
+            // イベントを一時的に解除
+            this.txtNote.TextChanged -= OnContentChanged;
+            txtNote.Text = text;
+            // イベントを再登録
+            this.txtNote.TextChanged += OnContentChanged;
+
+            System.Diagnostics.Debug.WriteLine($"[{NoteId}] テキスト設定: {text}");
+        }
+
+        /// <summary>
+        /// 付箋データを保存
+        /// </summary>
+        private void SaveNote()
+        {
+            try
+            {
+                Database.SaveOrUpdate(this);
+
+                string preview = string.IsNullOrEmpty(txtNote.Text) ? "(空)" :
+                    (txtNote.Text.Length > 20 ? txtNote.Text.Substring(0, 20) + "..." : txtNote.Text);
+
+                System.Diagnostics.Debug.WriteLine($"✓ 保存成功 [{NoteId}]: '{preview}' at ({Left},{Top})");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"✗ 保存エラー [{NoteId}]: {ex.Message}");
+                MessageBox.Show($"保存エラー:\n{ex.Message}", "エラー");
+            }
+        }
+
+        /// <summary>
+        /// フォームクローズ時の処理
+        /// </summary>
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            base.OnFormClosing(e);
+
+            System.Diagnostics.Debug.WriteLine($"[{NoteId}] フォームクローズ");
+
+            // タイマー停止
+            if (autoSaveTimer != null)
+            {
+                autoSaveTimer.Stop();
+                autoSaveTimer.Dispose();
+            }
+
+            // 最終保存
+            if (needsSave)
+            {
+                System.Diagnostics.Debug.WriteLine($"[{NoteId}] 最終保存実行");
+                SaveNote();
             }
         }
     }
