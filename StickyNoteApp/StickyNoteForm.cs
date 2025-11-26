@@ -22,6 +22,9 @@ namespace StickyNoteApp
             InitializeComponent();
             InitializeAutoSave();
 
+            // 最前面表示の初期状態を反映
+            UpdateTopMostMenuState();
+
             System.Diagnostics.Debug.WriteLine($"付箋作成: ID={NoteId}");
         }
 
@@ -113,7 +116,40 @@ namespace StickyNoteApp
                 this.Close();
             }
         }
+        /// <summary>
+        /// 右クリックメニュー：新しい付箋を作成
+        /// </summary>
+        private void newNoteMenuItem_Click(object sender, EventArgs e)
+        {
+            StickyNoteForm newNote = new StickyNoteForm();
+            // 現在の付箋の近くに表示
+            newNote.Location = new Point(this.Left + 30, this.Top + 30);
+            newNote.Show();
 
+            System.Diagnostics.Debug.WriteLine($"右クリックから新しい付箋作成: ID={newNote.NoteId}");
+        }
+
+        /// <summary>
+        /// 右クリックメニュー：最前面表示の切り替え
+        /// </summary>
+        private void topMostMenuItem_Click(object sender, EventArgs e)
+        {
+            this.TopMost = topMostMenuItem.Checked;
+            needsSave = true;
+
+            System.Diagnostics.Debug.WriteLine($"[{NoteId}] 最前面表示: {this.TopMost}");
+        }
+
+        /// <summary>
+        /// 最前面表示メニューの状態を更新
+        /// </summary>
+        private void UpdateTopMostMenuState()
+        {
+            if (topMostMenuItem != null)
+            {
+                topMostMenuItem.Checked = this.TopMost;
+            }
+        }
         /// <summary>
         /// 右クリックメニューの削除処理
         /// </summary>
@@ -140,7 +176,14 @@ namespace StickyNoteApp
 
             System.Diagnostics.Debug.WriteLine($"[{NoteId}] テキスト設定: {text}");
         }
-
+        /// <summary>
+        /// TopMostを設定（復元時用）
+        /// </summary>
+        public void SetTopMost(bool topMost)
+        {
+            this.TopMost = topMost;
+            UpdateTopMostMenuState();
+        }
         /// <summary>
         /// 付箋データを保存
         /// </summary>

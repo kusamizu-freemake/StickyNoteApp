@@ -28,7 +28,7 @@ namespace StickyNoteApp
             }
 
             InitializeTray(); // トレイアイコン初期化
-            RestoreNotes(); // ★ここで復元処理を呼び出す
+            RestoreNotes(); // ここで復元処理を呼び出す
         }
 
         /// <summary>
@@ -103,7 +103,10 @@ namespace StickyNoteApp
                             Convert.ToInt32(reader["BgG"]),
                             Convert.ToInt32(reader["BgB"])
                         );
-                        note.TopMost = Convert.ToInt32(reader["TopMostFlag"]) == 1;
+                        // TopMostを復元（SetTopMostメソッドを使用）
+                        bool topMost = Convert.ToInt32(reader["TopMostFlag"]) == 1;
+                        note.SetTopMost(topMost);
+
                         note.CreatedAt = reader["CreatedAt"].ToString();
 
                         // 付箋を表示

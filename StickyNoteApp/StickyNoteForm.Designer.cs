@@ -35,6 +35,9 @@ namespace StickyNoteApp
             this.btnClose = new System.Windows.Forms.Button();
             this.txtNote = new System.Windows.Forms.TextBox();
             this.contextMenu = new System.Windows.Forms.ContextMenuStrip(this.components);
+            this.newNoteMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.topMostMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.separatorMenuItem1 = new System.Windows.Forms.ToolStripSeparator();
             this.deleteMenuItem = new System.Windows.Forms.ToolStripMenuItem();
 
             this.SuspendLayout();
@@ -80,9 +83,28 @@ namespace StickyNoteApp
             this.txtNote.AcceptsTab = true;
             this.txtNote.WordWrap = true;
 
-            // ------- 右クリック削除メニュー -------
+            // ------- 右クリックメニュー -------
             this.contextMenu.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.deleteMenuItem});
+                this.newNoteMenuItem,
+                this.topMostMenuItem,
+                this.separatorMenuItem1,
+                this.deleteMenuItem
+            });
+
+            // 新しい付箋を作成
+            this.newNoteMenuItem.Text = "新しい付箋を作成";
+            this.newNoteMenuItem.Click += new System.EventHandler(this.newNoteMenuItem_Click);
+
+            // 最前面表示の切り替え
+            this.topMostMenuItem.Text = "✓ 最前面に表示";
+            this.topMostMenuItem.CheckOnClick = true;
+            this.topMostMenuItem.Checked = true;
+            this.topMostMenuItem.Click += new System.EventHandler(this.topMostMenuItem_Click);
+
+            // 区切り線
+            this.separatorMenuItem1.Name = "separatorMenuItem1";
+
+            // 削除
             this.deleteMenuItem.Text = "削除";
             this.deleteMenuItem.Click += new System.EventHandler(this.deleteMenuItem_Click);
 
@@ -105,6 +127,9 @@ namespace StickyNoteApp
         private System.Windows.Forms.Button btnClose;
         public System.Windows.Forms.TextBox txtNote; // ← publicに変更
         private System.Windows.Forms.ContextMenuStrip contextMenu;
+        private System.Windows.Forms.ToolStripMenuItem newNoteMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem topMostMenuItem;
+        private System.Windows.Forms.ToolStripSeparator separatorMenuItem1;
         private System.Windows.Forms.ToolStripMenuItem deleteMenuItem;
     }
 }
