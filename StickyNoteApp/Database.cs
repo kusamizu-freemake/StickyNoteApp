@@ -31,7 +31,8 @@ namespace StickyNoteApp
         {
             try
             {
-                // SQLitePCLの初期化（これだけで動作します）
+                // SQLitePCLの初期化 調査要
+                // 
                 SQLitePCL.Batteries.Init();
 
                 // ディレクトリが存在しない場合は作成
@@ -42,37 +43,74 @@ namespace StickyNoteApp
                 }
 
                 // テーブル作成
-                using (var con = new SqliteConnection(ConnectionString))
+                using (SqliteConnection con = new SqliteConnection(ConnectionString))
                 {
                     con.Open();
-                    string sql = @"
-                        CREATE TABLE IF NOT EXISTS StickyNotes (
-                            Id TEXT PRIMARY KEY,
-                            Content TEXT,
-                            PosX INTEGER,
-                            PosY INTEGER,
-                            Width INTEGER,
-                            Height INTEGER,
-                            BgR INTEGER,
-                            BgG INTEGER,
-                            BgB INTEGER,
-                            TopMostFlag INTEGER,
-                            DeleteFlag INTEGER DEFAULT 0,
-                            CreatedAt TEXT,
-                            UpdatedAt TEXT
-                        );
-                    ";
-                    using (var cmd = new SqliteCommand(sql, con))
+
+                    // StickyNotesテーブル存在確認
+                    if (!TableExists(con, "StickyNotes"))
                     {
-                        cmd.ExecuteNonQuery();
+                        System.Diagnostics.Debug.WriteLine("StickyNotesテーブルが存在しません。作成します。");
+                        CreateStickyNotesTable(con);
                     }
+
                 }
+
+                System.Diagnostics.Debug.WriteLine("データベース初期化完了");
             }
             catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"データベース初期化エラー: {ex.Message}");
                 throw new Exception($"データベース初期化エラー: {ex.Message}", ex);
             }
         }
+
+        /// <summary>
+        /// テーブルの存在確認
+        /// </summary>
+        public static bool TableExists(SqliteConnection con, string tableName)
+        {
+            string sql = "SELECT name FROM sqlite_master WHERE type='table' AND name=$tableName";
+
+            using (var cmd = new SqliteCommand(sql, con))
+            {
+                cmd.Parameters.AddWithValue("$tableName", tableName);
+                using (var reader = cmd.ExecuteReader())
+                {
+                    return reader.HasRows;
+                }
+            }
+        }
+
+        /// <summary>
+        /// StickyNotesテーブルの作成
+        /// </summary>
+        private static void CreateStickyNotesTable(SqliteConnection con)
+        {
+            string sql = @"
+                CREATE TABLE StickyNotes (
+                    Id TEXT PRIMARY KEY,
+                    Content TEXT,
+                    PosX INTEGER,
+                    PosY INTEGER,
+                    Width INTEGER,
+                    Height INTEGER,
+                    BgR INTEGER,
+                    BgG INTEGER,
+                    BgB INTEGER,
+                    TopMostFlag INTEGER,
+                    DeleteFlag INTEGER DEFAULT 0,
+                    CreatedAt TEXT,
+                    UpdatedAt TEXT
+                );
+            ";
+            using (var cmd = new SqliteCommand(sql, con))
+            {
+                cmd.ExecuteNonQuery();
+                System.Diagnostics.Debug.WriteLine("StickyNotesテーブル作成完了");
+            }
+        }
+
 
         /// <summary>
         /// 付箋データを保存または更新
@@ -81,10 +119,11 @@ namespace StickyNoteApp
         {
             try
             {
-                using (var con = new SqliteConnection(ConnectionString))
+                using (SqliteConnection con = new SqliteConnection(ConnectionString))
                 {
                     con.Open();
 
+                    // UPSERT クエリ
                     string sql = @"
                         INSERT INTO StickyNotes
                         (Id, Content, PosX, PosY, Width, Height, BgR, BgG, BgB, TopMostFlag, DeleteFlag, CreatedAt, UpdatedAt)
@@ -103,6 +142,7 @@ namespace StickyNoteApp
                             UpdatedAt = excluded.UpdatedAt;
                     ";
 
+                    // 付箋データを保存または更新
                     using (var cmd = new SqliteCommand(sql, con))
                     {
                         cmd.Parameters.AddWithValue("$Id", note.NoteId);
@@ -118,6 +158,7 @@ namespace StickyNoteApp
                         cmd.Parameters.AddWithValue("$CreatedAt", note.CreatedAt);
                         cmd.Parameters.AddWithValue("$UpdatedAt", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
 
+                        // 
                         cmd.ExecuteNonQuery();
                     }
                 }
@@ -135,13 +176,14 @@ namespace StickyNoteApp
         {
             try
             {
-                using (var con = new SqliteConnection(ConnectionString))
+                using (SqliteConnection con = new SqliteConnection(ConnectionString))
                 {
                     con.Open();
                     string sql = @"UPDATE StickyNotes SET DeleteFlag = 1, UpdatedAt = $UpdatedAt WHERE Id = $Id";
 
                     using (var cmd = new SqliteCommand(sql, con))
                     {
+                        // 
                         cmd.Parameters.AddWithValue("$Id", id);
                         cmd.Parameters.AddWithValue("$UpdatedAt", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
                         cmd.ExecuteNonQuery();

@@ -1,6 +1,6 @@
 namespace StickyNoteApp
 {
-    partial class NewForm
+    partial class TrayManagerForm
     {
         /// <summary>
         /// 必要なデザイナー変数です。

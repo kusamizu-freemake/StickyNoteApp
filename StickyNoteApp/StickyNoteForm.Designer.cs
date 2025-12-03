@@ -37,6 +37,19 @@ namespace StickyNoteApp
             this.contextMenu = new System.Windows.Forms.ContextMenuStrip(this.components);
             this.newNoteMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.topMostMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.colorMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.colorYellowMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.colorPinkMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.colorBlueMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.colorGreenMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.colorOrangeMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.colorPurpleMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.reminderMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.reminder5MinMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.reminder10MinMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.reminder30MinMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.reminder60MinMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.reminderCancelMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.separatorMenuItem1 = new System.Windows.Forms.ToolStripSeparator();
             this.deleteMenuItem = new System.Windows.Forms.ToolStripMenuItem();
 
@@ -46,12 +59,12 @@ namespace StickyNoteApp
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.None;
             this.BackColor = System.Drawing.Color.Khaki;
             this.ClientSize = new System.Drawing.Size(260, 220);
-            this.TopMost = true;
+            this.TopMost = false; // ← デフォルトをfalseに変更（最前面表示の問題を改善）
             this.StartPosition = System.Windows.Forms.FormStartPosition.Manual;
             this.ContextMenuStrip = this.contextMenu;
 
             // ------- タイトルバー -------
-            this.titleBar.BackColor = System.Drawing.Color.Khaki;
+            this.titleBar.BackColor = System.Drawing.Color.WhiteSmoke; // ← 白系の固定色に変更
             this.titleBar.Dock = System.Windows.Forms.DockStyle.Top;
             this.titleBar.Height = 40;
             this.titleBar.AutoSize = false;
@@ -87,19 +100,78 @@ namespace StickyNoteApp
             this.contextMenu.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
                 this.newNoteMenuItem,
                 this.topMostMenuItem,
+                this.colorMenuItem,
+                this.reminderMenuItem,
                 this.separatorMenuItem1,
                 this.deleteMenuItem
             });
 
             // 新しい付箋を作成
             this.newNoteMenuItem.Text = "新しい付箋を作成";
-            this.newNoteMenuItem.Click += new System.EventHandler(this.newNoteMenuItem_Click);
+            this.newNoteMenuItem.Click += new System.EventHandler(this.newNote_Click);
 
             // 最前面表示の切り替え
-            this.topMostMenuItem.Text = "✓ 最前面に表示";
+            this.topMostMenuItem.Text = "最前面に表示";
             this.topMostMenuItem.CheckOnClick = true;
-            this.topMostMenuItem.Checked = true;
+            this.topMostMenuItem.Checked = false; // ← デフォルトをfalseに変更
             this.topMostMenuItem.Click += new System.EventHandler(this.topMostMenuItem_Click);
+
+            // 色の変更（サブメニュー）
+            this.colorMenuItem.Text = "色の変更";
+            this.colorMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+                this.colorYellowMenuItem,
+                this.colorPinkMenuItem,
+                this.colorBlueMenuItem,
+                this.colorGreenMenuItem,
+                this.colorOrangeMenuItem,
+                this.colorPurpleMenuItem
+            });
+
+            // 各色のメニュー項目
+            this.colorYellowMenuItem.Text = "イエロー";
+            this.colorYellowMenuItem.Click += new System.EventHandler(this.colorYellowMenuItem_Click);
+
+            this.colorPinkMenuItem.Text = "ピンク";
+            this.colorPinkMenuItem.Click += new System.EventHandler(this.colorPinkMenuItem_Click);
+
+            this.colorBlueMenuItem.Text = "ブルー";
+            this.colorBlueMenuItem.Click += new System.EventHandler(this.colorBlueMenuItem_Click);
+
+            this.colorGreenMenuItem.Text = "グリーン";
+            this.colorGreenMenuItem.Click += new System.EventHandler(this.colorGreenMenuItem_Click);
+
+            this.colorOrangeMenuItem.Text = "オレンジ";
+            this.colorOrangeMenuItem.Click += new System.EventHandler(this.colorOrangeMenuItem_Click);
+
+            this.colorPurpleMenuItem.Text = "パープル";
+            this.colorPurpleMenuItem.Click += new System.EventHandler(this.colorPurpleMenuItem_Click);
+
+            // リマインダー（サブメニュー）
+            this.reminderMenuItem.Text = "リマインダー";
+            this.reminderMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+                this.reminder5MinMenuItem,
+                this.reminder10MinMenuItem,
+                this.reminder30MinMenuItem,
+                this.reminder60MinMenuItem,
+                new System.Windows.Forms.ToolStripSeparator(),
+                this.reminderCancelMenuItem
+            });
+
+            // リマインダーの各メニュー項目
+            this.reminder5MinMenuItem.Text = "時間を指定...";
+            this.reminder5MinMenuItem.Click += new System.EventHandler(this.reminderCustomMenuItem_Click);
+
+            this.reminder10MinMenuItem.Text = "10分後";
+            this.reminder10MinMenuItem.Click += new System.EventHandler(this.reminder10MinMenuItem_Click);
+
+            this.reminder30MinMenuItem.Text = "30分後";
+            this.reminder30MinMenuItem.Click += new System.EventHandler(this.reminder30MinMenuItem_Click);
+
+            this.reminder60MinMenuItem.Text = "60分後";
+            this.reminder60MinMenuItem.Click += new System.EventHandler(this.reminder60MinMenuItem_Click);
+
+            this.reminderCancelMenuItem.Text = "リマインダーをキャンセル";
+            this.reminderCancelMenuItem.Click += new System.EventHandler(this.reminderCancelMenuItem_Click);
 
             // 区切り線
             this.separatorMenuItem1.Name = "separatorMenuItem1";
@@ -129,6 +201,19 @@ namespace StickyNoteApp
         private System.Windows.Forms.ContextMenuStrip contextMenu;
         private System.Windows.Forms.ToolStripMenuItem newNoteMenuItem;
         private System.Windows.Forms.ToolStripMenuItem topMostMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem colorMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem colorYellowMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem colorPinkMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem colorBlueMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem colorGreenMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem colorOrangeMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem colorPurpleMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem reminderMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem reminder5MinMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem reminder10MinMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem reminder30MinMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem reminder60MinMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem reminderCancelMenuItem;
         private System.Windows.Forms.ToolStripSeparator separatorMenuItem1;
         private System.Windows.Forms.ToolStripMenuItem deleteMenuItem;
     }
