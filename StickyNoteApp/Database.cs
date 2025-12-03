@@ -27,7 +27,7 @@ namespace StickyNoteApp
         /// <summary>
         /// データベース初期化
         /// </summary>
-        public static void Initialize()
+        public static void DatabaseInitialize()
         {
             try
             {

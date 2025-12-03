@@ -21,7 +21,7 @@ namespace StickyNoteApp
             try
             {
                 System.Diagnostics.Debug.WriteLine("Startup: データベース初期化開始");
-                Database.Initialize();
+                Database.DatabaseInitialize();
                 System.Diagnostics.Debug.WriteLine("Startup: データベース初期化完了");
             }
             catch (Exception ex)
