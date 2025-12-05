@@ -27,7 +27,7 @@ namespace StickyNoteApp
         /// <summary>
         /// データベース初期化
         /// </summary>
-        public static void DatabaseInitialize()
+        public static void InitializeDatabase()
         {
             try
             {
@@ -53,7 +53,15 @@ namespace StickyNoteApp
                         System.Diagnostics.Debug.WriteLine("StickyNotesテーブルが存在しません。作成します。");
                         CreateStickyNotesTable(con);
                     }
-
+                    else
+                    {
+                        // 既存のテーブルにImagePathカランがあるか確認
+                        if (!ColumnExists(con, "StickyNotes", "ImagePath"))
+                        {
+                            System.Diagnostics.Debug.WriteLine("ImagePathカラムを追加します。");
+                            AddImagePathColumn(con);
+                        }
+                    }
                 }
 
                 System.Diagnostics.Debug.WriteLine("データベース初期化完了");
@@ -81,6 +89,40 @@ namespace StickyNoteApp
                 }
             }
         }
+        /// <summary>
+        /// カラムの存在確認
+        /// </summary>
+        private static bool ColumnExists(SqliteConnection con, string tableName, string columnName)
+        {
+            string sql = $"PRAGMA table_info({tableName})";
+
+            using (var cmd = new SqliteCommand(sql, con))
+            using (var reader = cmd.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    if (reader["name"].ToString() == columnName)
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// ImagePathカラムを追加（既存テーブル用）
+        /// </summary>
+        private static void AddImagePathColumn(SqliteConnection con)
+        {
+            string sql = "ALTER TABLE StickyNotes ADD COLUMN ImagePath TEXT";
+            using (var cmd = new SqliteCommand(sql, con))
+            {
+                cmd.ExecuteNonQuery();
+                System.Diagnostics.Debug.WriteLine("ImagePathカラム追加完了");
+            }
+        }
 
         /// <summary>
         /// StickyNotesテーブルの作成
@@ -100,6 +142,7 @@ namespace StickyNoteApp
                     BgB INTEGER,
                     TopMostFlag INTEGER,
                     DeleteFlag INTEGER DEFAULT 0,
+                    ImagePath TEXT,
                     CreatedAt TEXT,
                     UpdatedAt TEXT
                 );
@@ -113,7 +156,7 @@ namespace StickyNoteApp
 
 
         /// <summary>
-        /// 付箋データを保存または更新
+        // SQLパラメータの設定（INSERT or UPDATE 用）
         /// </summary>
         public static void SaveOrUpdate(StickyNoteForm note)
         {
@@ -123,12 +166,12 @@ namespace StickyNoteApp
                 {
                     con.Open();
 
-                    // UPSERT クエリ
+                    // UPSERTクエリ
                     string sql = @"
                         INSERT INTO StickyNotes
-                        (Id, Content, PosX, PosY, Width, Height, BgR, BgG, BgB, TopMostFlag, DeleteFlag, CreatedAt, UpdatedAt)
+                        (Id, Content, PosX, PosY, Width, Height, BgR, BgG, BgB, TopMostFlag, DeleteFlag, ImagePath, CreatedAt, UpdatedAt)
                         VALUES
-                        ($Id, $Content, $PosX, $PosY, $Width, $Height, $BgR, $BgG, $BgB, $TopMostFlag, 0, $CreatedAt, $UpdatedAt)
+                        ($Id, $Content, $PosX, $PosY, $Width, $Height, $BgR, $BgG, $BgB, $TopMostFlag, 0, $ImagePath, $CreatedAt, $UpdatedAt)
                         ON CONFLICT(Id) DO UPDATE SET
                             Content = excluded.Content,
                             PosX = excluded.PosX,
@@ -139,14 +182,15 @@ namespace StickyNoteApp
                             BgG = excluded.BgG,
                             BgB = excluded.BgB,
                             TopMostFlag = excluded.TopMostFlag,
+                            ImagePath = excluded.ImagePath,
                             UpdatedAt = excluded.UpdatedAt;
                     ";
 
-                    // 付箋データを保存または更新
+                    // UPSERT用SQLパラメータ（付箋データ）の設定
                     using (var cmd = new SqliteCommand(sql, con))
                     {
                         cmd.Parameters.AddWithValue("$Id", note.NoteId);
-                        cmd.Parameters.AddWithValue("$Content", note.txtNote.Text ?? "");
+                        cmd.Parameters.AddWithValue("$Content", string.IsNullOrEmpty(note.txtNote.Text) ? "" : note.txtNote.Text); // 空文字対応
                         cmd.Parameters.AddWithValue("$PosX", note.Left);
                         cmd.Parameters.AddWithValue("$PosY", note.Top);
                         cmd.Parameters.AddWithValue("$Width", note.Width);
@@ -155,10 +199,11 @@ namespace StickyNoteApp
                         cmd.Parameters.AddWithValue("$BgG", note.BackColor.G);
                         cmd.Parameters.AddWithValue("$BgB", note.BackColor.B);
                         cmd.Parameters.AddWithValue("$TopMostFlag", note.TopMost ? 1 : 0);
+                        cmd.Parameters.AddWithValue("$ImagePath", string.IsNullOrEmpty(note.CapturedImagePath) ? "" : note.CapturedImagePath); // 空文字対応
                         cmd.Parameters.AddWithValue("$CreatedAt", note.CreatedAt);
                         cmd.Parameters.AddWithValue("$UpdatedAt", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
 
-                        // 
+                        // INSERTまたはUPDATE を実行 
                         cmd.ExecuteNonQuery();
                     }
                 }

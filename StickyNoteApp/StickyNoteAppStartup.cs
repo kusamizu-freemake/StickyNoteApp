@@ -1,12 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace StickyNoteApp
 {
-    internal static class Startup
+    internal static class StickyNoteAppStartup
     {
         /// <summary>
         /// アプリケーションのメイン エントリ ポイントです。
@@ -14,14 +15,26 @@ namespace StickyNoteApp
         [STAThread]
         static void Main()
         {
-            Application.EnableVisualStyles();
-            Application.SetCompatibleTextRenderingDefault(false);
+            // 二重起動防止
+            bool createdNew;
+            using (Mutex mutex = new Mutex(true, "StickyNoteApp_Mutex", out createdNew))
+            {
+                if (!createdNew)
+                {
+                    MessageBox.Show("すでにアプリが起動しています。", "二重起動防止", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                Application.EnableVisualStyles();
+                Application.SetCompatibleTextRenderingDefault(false);
+            }
+
 
             // データベース初期化
             try
             {
                 System.Diagnostics.Debug.WriteLine("Startup: データベース初期化開始");
-                Database.DatabaseInitialize();
+                Database.InitializeDatabase();
                 System.Diagnostics.Debug.WriteLine("Startup: データベース初期化完了");
             }
             catch (Exception ex)

@@ -70,6 +70,11 @@ namespace StickyNoteApp
             trayMenu.Items.Add(new ToolStripSeparator()); // 区切り線
             trayMenu.Items.Add("データベース整合性チェック", null, OnDatabaseIntegrityCheckClicked);
 
+            // 画面キャプチャテスト
+            var captureTestItem = new ToolStripMenuItem("画面キャプチャテスト");
+            captureTestItem.Click += OnCaptureTestClicked;
+            trayMenu.Items.Add(captureTestItem);
+
             // 設定（未実装）
             trayMenu.Items.Add("設定", null, OnSettingClicked);
             trayMenu.Items.Add(new ToolStripSeparator()); // 区切り線
@@ -126,30 +131,39 @@ namespace StickyNoteApp
                         // 付箋フォームを作成
                         StickyNoteForm note = new StickyNoteForm();
 
-                        // データベースから値を復元
+                        // データベースから値を復元（順序を変更）
                         note.NoteId = id;
-                        note.SetText(content);
-                        note.Location = new Point(posX, posY);
-                        note.Size = new Size(
-                            Convert.ToInt32(reader["Width"]),
-                            Convert.ToInt32(reader["Height"])
-                        );
-                        // 色を復元
+                        note.CreatedAt = reader["CreatedAt"].ToString();
+
+                        // 色を先に復元
                         Color bgColor = Color.FromArgb(
                             Convert.ToInt32(reader["BgR"]),
                             Convert.ToInt32(reader["BgG"]),
                             Convert.ToInt32(reader["BgB"])
                         );
-
-                        // フォームとテキストボックスの背景色を設定
                         note.BackColor = bgColor;
                         note.txtNote.BackColor = bgColor;
-                       
-                        // TopMostを復元（SetTopMostメソッドを使用）
+
+                        // 位置とサイズを復元
+                        note.Location = new Point(posX, posY);
+                        note.Size = new Size(
+                            Convert.ToInt32(reader["Width"]),
+                            Convert.ToInt32(reader["Height"])
+                        );
+
+                        // TopMostを復元
                         bool topMost = Convert.ToInt32(reader["TopMostFlag"]) == 1;
                         note.SetTopMost(topMost);
 
-                        note.CreatedAt = reader["CreatedAt"].ToString();
+                        // テキストを最後に復元
+                        note.SetText(content);
+
+                        // 画像を復元
+                        string imagePath = reader["ImagePath"]?.ToString();
+                        if (!string.IsNullOrEmpty(imagePath))
+                        {
+                            note.LoadCapturedImage(imagePath);
+                        }
 
                         // 付箋をリストに追加
                         allNotes.Add(note);
@@ -227,6 +241,108 @@ namespace StickyNoteApp
                 allNotesVisible = true;
                 toggleAllNotesMenuItem.Text = "すべての付箋を非表示";
                 System.Diagnostics.Debug.WriteLine($"すべての付箋を表示しました ({allNotes.Count}件)");
+            }
+        }
+
+        /// <summary>
+        /// 画面キャプチャテスト
+        /// </summary>
+        private void OnCaptureTestClicked(object sender, EventArgs e)
+        {
+            System.Diagnostics.Debug.WriteLine("画面キャプチャテスト開始");
+
+            try
+            {
+                // オーバーレイフォームを作成
+                var overlay = new ScreenCaptureOverlay();
+
+                // キャプチャ完了イベントを登録
+                overlay.CaptureCompleted += (s, args) =>
+                {
+                    System.Diagnostics.Debug.WriteLine($"キャプチャ完了: {args.CapturedImage.Width}x{args.CapturedImage.Height}");
+
+                    // テスト用：キャプチャした画像を表示
+                    ShowCapturedImageTest(args.CapturedImage);
+                };
+
+                // モーダル表示
+                overlay.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"キャプチャテストエラー: {ex.Message}");
+                MessageBox.Show($"キャプチャテストエラー:\n{ex.Message}", "エラー",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>
+        /// キャプチャした画像を表示（テスト用）
+        /// </summary>
+        private void ShowCapturedImageTest(Bitmap image)
+        {
+            // テスト用フォームを作成
+            var testForm = new Form();
+            testForm.Text = "キャプチャテスト結果";
+            testForm.Size = new Size(600, 500);
+            testForm.StartPosition = FormStartPosition.CenterScreen;
+
+            var pictureBox = new PictureBox();
+            pictureBox.Dock = DockStyle.Fill;
+            pictureBox.SizeMode = PictureBoxSizeMode.Zoom;
+            pictureBox.Image = image;
+
+            var saveButton = new Button();
+            saveButton.Text = "画像を保存";
+            saveButton.Dock = DockStyle.Bottom;
+            saveButton.Height = 40;
+            saveButton.Click += (s, e) =>
+            {
+                SaveCapturedImageTest(image);
+            };
+
+            var infoLabel = new Label();
+            infoLabel.Text = $"サイズ: {image.Width} × {image.Height}";
+            infoLabel.Dock = DockStyle.Top;
+            infoLabel.Height = 30;
+            infoLabel.TextAlign = ContentAlignment.MiddleCenter;
+            infoLabel.BackColor = Color.LightGray;
+
+            testForm.Controls.Add(pictureBox);
+            testForm.Controls.Add(saveButton);
+            testForm.Controls.Add(infoLabel);
+
+            testForm.Show();
+        }
+
+        /// <summary>
+        /// キャプチャ画像を保存（テスト用）
+        /// </summary>
+        private void SaveCapturedImageTest(Bitmap image)
+        {
+            try
+            {
+                using (var saveDialog = new SaveFileDialog())
+                {
+                    saveDialog.Filter = "PNG画像|*.png|JPEG画像|*.jpg|すべてのファイル|*.*";
+                    saveDialog.DefaultExt = "png";
+                    saveDialog.FileName = $"capture_{DateTime.Now:yyyyMMdd_HHmmss}.png";
+
+                    if (saveDialog.ShowDialog() == DialogResult.OK)
+                    {
+                        image.Save(saveDialog.FileName, System.Drawing.Imaging.ImageFormat.Png);
+                        MessageBox.Show($"画像を保存しました:\n{saveDialog.FileName}", "保存完了",
+                            MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                        System.Diagnostics.Debug.WriteLine($"画像保存完了: {saveDialog.FileName}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"画像の保存に失敗しました:\n{ex.Message}", "エラー",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                System.Diagnostics.Debug.WriteLine($"画像保存エラー: {ex.Message}");
             }
         }
 
@@ -322,20 +438,20 @@ namespace StickyNoteApp
         }
 
         /// <summary>
-        /// Windowsメッセージを処理（ホットキー用）
+        /// Windowsメッセージを処理（ホットキー用） 不要？なためコメントアウト
         /// </summary>
-        protected override void WndProc(ref Message m)
-        {
-            const int WM_HOTKEY = 0x0312;
+        //protected override void WndProc(ref Message m)
+        //{
+        //    const int WM_HOTKEY = 0x0312;
 
-            if (m.Msg == WM_HOTKEY)
-            {
-                int hotkeyId = m.WParam.ToInt32();
-                hotkeyManager.ProcessHotkey(hotkeyId);
-            }
+        //    if (m.Msg == WM_HOTKEY)
+        //    {
+        //        int hotkeyId = m.WParam.ToInt32();
+        //        hotkeyManager.ProcessHotkey(hotkeyId);
+        //    }
 
-            base.WndProc(ref m);
-        }
+        //    base.WndProc(ref m);
+        //}
 
         /// <summary>
         /// フォームクローズ時の処理
