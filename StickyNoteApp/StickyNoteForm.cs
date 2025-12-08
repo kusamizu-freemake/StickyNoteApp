@@ -59,7 +59,7 @@ namespace StickyNoteApp
         {
             InitializeComponent();            // フォームデザイナーで設定したUI要素の初期化
             InitializeAutoSave();             // 自動保存タイマーの初期化
-            InitializeResizeHandlers();       // サイズ変更ハンドラーの初期化
+            InitializeResizeHandlers();       // イベントハンドラーの初期化
             InitializeReminder();             // リマインダー管理の初期化
             InitializePictureBox();           // 画面キャプチャ用のPictureBox初期化
 
@@ -71,9 +71,9 @@ namespace StickyNoteApp
             System.Diagnostics.Debug.WriteLine($"付箋作成: ID={NoteId}");
         }
 
-       
+
         /// <summary>
-        /// サイズ変更ハンドラーの初期化
+        /// イベントハンドラーの初期化
         /// </summary>
         private void InitializeResizeHandlers()
         {
@@ -87,6 +87,12 @@ namespace StickyNoteApp
             this.txtNote.MouseMove += TxtNote_MouseMove;
             this.txtNote.MouseDown += TxtNote_MouseDown;
             this.txtNote.MouseUp += TxtNote_MouseUp;
+
+            // イベントハンドラー登録
+            this.txtNote.TextChanged += StickyNoteContentChanged;
+            this.LocationChanged += OnLocationChanged;
+            this.SizeChanged += OnSizeChanged;
+            this.BackColorChanged += StickyNoteContentChanged;
         }
 
         /// <summary>
@@ -408,11 +414,6 @@ namespace StickyNoteApp
             autoSaveTimer.Tick += AutoSaveTimer_Tick;
             autoSaveTimer.Start();
 
-            // イベントハンドラー登録
-            this.txtNote.TextChanged += StickyNoteContentChanged;
-            this.LocationChanged += OnLocationChanged;
-            this.SizeChanged += OnSizeChanged;
-            this.BackColorChanged += StickyNoteContentChanged;
         }
 
         /// <summary>
