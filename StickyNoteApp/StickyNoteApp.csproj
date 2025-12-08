@@ -98,6 +98,9 @@
     <Compile Include="DbIntegrityChecker.cs" />
     <Compile Include="HotkeyManager.cs" />
     <Compile Include="ReminderManager.cs" />
+    <Compile Include="ScreenCaptureOverlay .cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="TrayManagerForm.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -110,7 +113,7 @@
     <Compile Include="StickyNoteForm.Designer.cs">
       <DependentUpon>StickyNoteForm.cs</DependentUpon>
     </Compile>
-    <Compile Include="Startup.cs" />
+    <Compile Include="StickyNoteAppStartup.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <EmbeddedResource Include="StickyNoteForm.resx">
       <DependentUpon>StickyNoteForm.cs</DependentUpon>

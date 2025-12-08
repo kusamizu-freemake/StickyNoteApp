@@ -44,6 +44,8 @@ namespace StickyNoteApp
             this.colorGreenMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.colorOrangeMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.colorPurpleMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.captureMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.pasteImageMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.reminderMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.reminder5MinMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.reminder10MinMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -101,6 +103,8 @@ namespace StickyNoteApp
                 this.newNoteMenuItem,
                 this.topMostMenuItem,
                 this.colorMenuItem,
+                this.captureMenuItem,
+                this.pasteImageMenuItem,
                 this.reminderMenuItem,
                 this.separatorMenuItem1,
                 this.deleteMenuItem
@@ -108,7 +112,7 @@ namespace StickyNoteApp
 
             // 新しい付箋を作成
             this.newNoteMenuItem.Text = "新しい付箋を作成";
-            this.newNoteMenuItem.Click += new System.EventHandler(this.newNote_Click);
+            this.newNoteMenuItem.Click += new System.EventHandler(this.StickyNoteMenu_New_Click);
 
             // 最前面表示の切り替え
             this.topMostMenuItem.Text = "最前面に表示";
@@ -145,6 +149,14 @@ namespace StickyNoteApp
 
             this.colorPurpleMenuItem.Text = "パープル";
             this.colorPurpleMenuItem.Click += new System.EventHandler(this.colorPurpleMenuItem_Click);
+
+            // 画面キャプチャ
+            this.captureMenuItem.Text = "画面キャプチャ";
+            this.captureMenuItem.Click += new System.EventHandler(this.captureMenuItem_Click);
+
+            // クリップボードから画像を貼り付け
+            this.pasteImageMenuItem.Text = "クリップボードから画像を貼り付け";
+            this.pasteImageMenuItem.Click += new System.EventHandler(this.pasteImageMenuItem_Click);
 
             // リマインダー（サブメニュー）
             this.reminderMenuItem.Text = "リマインダー";
@@ -208,6 +220,8 @@ namespace StickyNoteApp
         private System.Windows.Forms.ToolStripMenuItem colorGreenMenuItem;
         private System.Windows.Forms.ToolStripMenuItem colorOrangeMenuItem;
         private System.Windows.Forms.ToolStripMenuItem colorPurpleMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem captureMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem pasteImageMenuItem;
         private System.Windows.Forms.ToolStripMenuItem reminderMenuItem;
         private System.Windows.Forms.ToolStripMenuItem reminder5MinMenuItem;
         private System.Windows.Forms.ToolStripMenuItem reminder10MinMenuItem;
