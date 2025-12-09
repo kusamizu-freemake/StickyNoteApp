@@ -14,7 +14,7 @@ namespace StickyNoteApp
         private string noteId;
         private bool isActive = false;
 
-        public event EventHandler ReminderTriggered;　// / リマインダー発火イベント
+        public event EventHandler ReminderTriggered; // リマインダー発火イベント
 
         /// <summary>
         /// リマインダーが設定されているか
