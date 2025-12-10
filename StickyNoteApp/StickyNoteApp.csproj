@@ -98,6 +98,9 @@
     <Compile Include="DbIntegrityChecker.cs" />
     <Compile Include="HotkeyManager.cs" />
     <Compile Include="ReminderManager.cs" />
+    <Compile Include="ReminderManager.Designer.cs">
+      <DependentUpon>ReminderManager.cs</DependentUpon>
+    </Compile>
     <Compile Include="ScreenCaptureOverlay .cs">
       <SubType>Form</SubType>
     </Compile>

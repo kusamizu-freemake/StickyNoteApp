@@ -1040,134 +1040,29 @@ namespace StickyNoteApp
         }
 
         /// <summary>
-        /// リマインダーメニュー：カスタム時間指定 RemainderManeger.Desinger.csに処理を移動予定
+        /// リマインダーメニュー：カスタム時間指定 RemainderManeger.Desinger.csに処理を移動予定 
         /// </summary>
         private void reminderCustomMenuItem_Click(object sender, EventArgs e)
         {
-            // カスタム時間入力ダイアログを表示
-            using (var inputForm = new Form())
+            int minutes = 0;
+            using (Form inputForm = new Form())
             {
                 inputForm.Text = "リマインダー時間設定";
-                inputForm.Width = 300;
-                inputForm.Height = 150;
-                inputForm.FormBorderStyle = FormBorderStyle.FixedDialog;
-                inputForm.StartPosition = FormStartPosition.CenterParent;
-                inputForm.MaximizeBox = false;
-                inputForm.MinimizeBox = false;
-
-                var label = new Label()
-                {
-                    Text = "通知までの時間を入力してください（1〜60分）:",
-                    Left = 20,
-                    Top = 20,
-                    Width = 250
-                };
-
-                var numericUpDown = new NumericUpDown()
-                {
-                    Left = 20,
-                    Top = 50,
-                    Width = 100,
-                    Minimum = 1,
-                    Maximum = 60,
-                    Value = 5
-                };
-
-                var labelMin = new Label()
-                {
-                    Text = "分後",
-                    Left = 125,
-                    Top = 53,
-                    Width = 40
-                };
-
-                var okButton = new Button()
-                {
-                    Text = "設定",
-                    Left = 100,
-                    Top = 80,
-                    Width = 80,
-                    DialogResult = DialogResult.OK
-                };
-
-                var cancelButton = new Button()
-                {
-                    Text = "キャンセル",
-                    Left = 190,
-                    Top = 80,
-                    Width = 80,
-                    DialogResult = DialogResult.Cancel
-                };
-
+                inputForm.Width = 250;
+                inputForm.Height = 120;
+                Label label = new Label() { Left = 10, Top = 10, Text = "時間(分単位)を入力:", AutoSize = true };
+                NumericUpDown upDown = new NumericUpDown() { Left = 10, Top = 50, Width = 60, Minimum = 1, Maximum = 1440, Value = 5 }; // 1分から1440分(24時間)まで, 初期値5分　// 座標位置変更予定
+                Button okBtn = new Button() { Text = "OK", Left = 150, Width = 60, Top = 8, DialogResult = DialogResult.OK };　// 座標位置変更予定
                 inputForm.Controls.Add(label);
-                inputForm.Controls.Add(numericUpDown);
-                inputForm.Controls.Add(labelMin);
-                inputForm.Controls.Add(okButton);
-                inputForm.Controls.Add(cancelButton);
-                inputForm.AcceptButton = okButton;
-                inputForm.CancelButton = cancelButton;
-
+                inputForm.Controls.Add(upDown);
+                inputForm.Controls.Add(okBtn);
+                inputForm.AcceptButton = okBtn;
                 if (inputForm.ShowDialog() == DialogResult.OK)
                 {
-                    int minutes = (int)numericUpDown.Value;
-                    SetReminder(minutes);
+                    minutes = (int)upDown.Value;
+                    reminderManager.SetReminder(NoteId, txtNote.Text, minutes);
                 }
             }
-        }
-
-        /// <summary>
-        /// リマインダーメニュー：10分後
-        /// </summary>
-        private void reminder10MinMenuItem_Click(object sender, EventArgs e)
-        {
-            SetReminder(10);
-        }
-
-        /// <summary>
-        /// リマインダーメニュー：30分後
-        /// </summary>
-        private void reminder30MinMenuItem_Click(object sender, EventArgs e)
-        {
-            SetReminder(30);
-        }
-
-        /// <summary>
-        /// リマインダーメニュー：60分後
-        /// </summary>
-        private void reminder60MinMenuItem_Click(object sender, EventArgs e)
-        {
-            SetReminder(60);
-        }
-
-        /// <summary>
-        /// リマインダーメニュー：キャンセル
-        /// </summary>
-        private void reminderCancelMenuItem_Click(object sender, EventArgs e)
-        {
-            if (reminderManager != null && reminderManager.IsActive)
-            {
-                reminderManager.CancelReminder();
-                MessageBox.Show("リマインダーをキャンセルしました。", "リマインダー", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            }
-            else
-            {
-                MessageBox.Show("設定されているリマインダーはありません。", "リマインダー", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            }
-        }
-
-        /// <summary>
-        /// リマインダーを設定
-        /// </summary>
-        private void SetReminder(int minutes)
-        {
-            if (reminderManager == null)
-            {
-                MessageBox.Show("リマインダーマネージャーが初期化されていません。", "エラー", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
-            }
-
-            reminderManager.SetReminder(NoteId, txtNote.Text, minutes);
-
             DateTime reminderTime = DateTime.Now.AddMinutes(minutes);
             MessageBox.Show(
                 $"{minutes}分後にリマインダーを通知します。\n\n通知時刻: {reminderTime:HH:mm:ss}",
@@ -1175,6 +1070,38 @@ namespace StickyNoteApp
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information
             );
+        }
+
+        /// <summary>
+        /// リマインダーメニュー：10分後
+        /// </summary>
+        private void reminder10MinMenuItem_Click(object sender, EventArgs e)
+        {
+            reminderManager.SetReminderWithMessage(NoteId, txtNote.Text, 10);
+        }
+
+        /// <summary>
+        /// リマインダーメニュー：30分後
+        /// </summary>
+        private void reminder30MinMenuItem_Click(object sender, EventArgs e)
+        {
+            reminderManager.SetReminderWithMessage(NoteId, txtNote.Text, 30);
+        }
+
+        /// <summary>
+        /// リマインダーメニュー：60分後
+        /// </summary>
+        private void reminder60MinMenuItem_Click(object sender, EventArgs e)
+        {
+            reminderManager.SetReminderWithMessage(NoteId, txtNote.Text, 60);
+        }
+
+        /// <summary>
+        /// リマインダーメニュー：キャンセル
+        /// </summary>
+        private void reminderCancelMenuItem_Click(object sender, EventArgs e)
+        {
+            reminderManager.ShowCancelConfirmation();
         }
 
         /// <summary>

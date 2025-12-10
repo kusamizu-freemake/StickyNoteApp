@@ -6,7 +6,7 @@ namespace StickyNoteApp
     /// <summary>
     /// リマインダー管理クラス
     /// </summary>
-    public class ReminderManager
+    public partial class ReminderManager
     {
         private Timer reminderTimer;
         private DateTime reminderTime;
@@ -105,6 +105,57 @@ namespace StickyNoteApp
                 MessageBoxIcon.Information
             );
         }
+
+        // StickyNoteForm.csから移動したメソッド群
+        // ------------------------------
+        /// <summary>
+        /// カスタム時間指定ダイアログを表示してリマインダーを設定
+        /// </summary>  
+        public void ShowCustomReminderDialog(string noteId, string noteContent, int minutes)
+        {
+            SetReminder(noteId, noteContent, minutes);
+            DateTime reminderTime = DateTime.Now.AddMinutes(minutes);
+            MessageBox.Show(
+                $"{minutes}分後にリマインダーを通知します。\n\n通知時刻: {reminderTime:HH:mm:ss}",
+                "リマインダー設定",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information
+            );
+
+        }
+
+        /// <summary>
+        /// 指定時間後にリマインダーを設定してメッセージを表示
+        /// </summary>
+        public void SetReminderWithMessage(string noteId, string noteContent, int minutes)
+        {
+            SetReminder(noteId, noteContent, minutes);
+
+            DateTime reminderTime = DateTime.Now.AddMinutes(minutes);
+            MessageBox.Show(
+                $"{minutes}分後にリマインダーを通知します。\n\n通知時刻: {reminderTime:HH:mm:ss}",
+                "リマインダー設定",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information
+            );
+        }
+
+        /// <summary>
+        /// リマインダーキャンセル確認ダイアログを表示
+        /// </summary>
+        public void ShowCancelConfirmation()
+        {
+            if (IsActive)
+            {
+                CancelReminder();
+                MessageBox.Show("リマインダーをキャンセルしました。", "リマインダー", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            else
+            {
+                MessageBox.Show("設定されているリマインダーはありません。", "リマインダー", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
+        // ------------------------------
 
         /// <summary>
         /// リソースの解放
