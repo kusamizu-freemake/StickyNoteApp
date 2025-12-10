@@ -31,8 +31,10 @@ namespace StickyNoteApp
         {
             try
             {
-                // SQLitePCLの初期化 調査要
-                // 
+                // SQLitePCLの初期化
+                // SQLiteのネイティブライブラリを読み込むために必要
+                // この初期化がないとデータベース接続時にエラーが発生する
+                // アプリケーション全体で1回だけ実行すれば十分
                 SQLitePCL.Batteries.Init();
 
                 // ディレクトリが存在しない場合は作成
