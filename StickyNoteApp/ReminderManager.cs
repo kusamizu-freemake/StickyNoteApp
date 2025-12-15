@@ -1,21 +1,36 @@
 using System;
 using System.Drawing;
+using System.Threading;
 using System.Windows.Forms;
 
 namespace StickyNoteApp
 {
     /// <summary>
+    /// リマインダー情報クラス
+    /// </summary>
+    public class ReminderInfo
+    {
+        public bool IsActive { get; set; }
+        public DateTime ReminderTime { get; set; }
+    }
+
+    /// <summary>
     /// リマインダー管理クラス
     /// </summary>
     public partial class ReminderManager : Form
     {
-        private Timer reminderTimer;
+        // Timerの宣言を明示的にSystem.Windows.Forms.Timerに変更
+        private System.Windows.Forms.Timer reminderTimer;
         private DateTime reminderTime;
         private string noteContent;
         private string noteId;
         private bool isActive = false;
 
-        public event EventHandler ReminderTriggered; // リマインダー発火イベント
+        // インスタンス管理用（デバッグ確認用）
+        private static int instanceCount = 0;
+
+        public event EventHandler ReminderTriggered;
+        public event EventHandler ReminderStateChanged; // リマインダー状態変更イベント
 
         /// <summary>
         /// リマインダーが設定されているか
@@ -26,6 +41,89 @@ namespace StickyNoteApp
         /// リマインダー時刻
         /// </summary>
         public DateTime ReminderTime => reminderTime;
+
+        /// <summary>
+        /// コンストラクタ（インスタンス作成ログ）
+        /// </summary>
+        public ReminderManager()
+        {
+            System.Diagnostics.Debug.WriteLine($"[ReminderManager] ctor Hash={this.GetHashCode()} Thread={Thread.CurrentThread.ManagedThreadId}");
+            Interlocked.Increment(ref instanceCount);
+            System.Diagnostics.Debug.WriteLine($"[ReminderManager] instanceCount={instanceCount}");
+        }
+
+        /// <summary>
+        /// ファイナライザ（GCで回収された場合のログ）
+        /// </summary>
+        ~ReminderManager()
+        {
+            System.Diagnostics.Debug.WriteLine($"[ReminderManager] Finalizer Hash={this.GetHashCode()} Thread={Thread.CurrentThread.ManagedThreadId}");
+            try { Interlocked.Decrement(ref instanceCount); } catch { }
+            System.Diagnostics.Debug.WriteLine($"[ReminderManager] instanceCount(after finalizer)={instanceCount}");
+        }
+
+        /// <summary>
+        /// リマインダー情報を取得
+        /// </summary>
+        public ReminderInfo GetReminderInfo()
+        {
+            return new ReminderInfo
+            {
+                IsActive = isActive,
+                ReminderTime = reminderTime
+            };
+        }
+
+        /// <summary>
+        /// リマインダーを復元（データベースからの読み込み時用）
+        /// ※ UI スレッドで実行されていることを保証（必要なら marshal する）
+        /// </summary>
+        public void RestoreReminder(string noteId, string content, DateTime reminderTime)
+        {
+            try
+            {
+                // UI スレッドでない場合は marshal して再実行する
+                if (this.InvokeRequired)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[{noteId}] RestoreReminder: InvokeRequired=true, marshaling to UI thread. Thread={Thread.CurrentThread.ManagedThreadId}");
+                    this.BeginInvoke(new Action(() => RestoreReminder(noteId, content, reminderTime)));
+                    return;
+                }
+
+                // 過去の時刻は無視
+                if (reminderTime <= DateTime.Now)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[{noteId}] リマインダー時刻が過去のためスキップ: {reminderTime:yyyy-MM-dd HH:mm:ss}");
+                    return;
+                }
+
+                this.noteId = noteId;
+                this.noteContent = content ?? string.Empty;
+                this.reminderTime = reminderTime;
+                this.isActive = true;
+
+                // 既存のタイマーがあれば停止
+                if (reminderTimer != null)
+                {
+                    reminderTimer.Stop();
+                    reminderTimer.Tick -= ReminderTimer_Tick;
+                    reminderTimer.Dispose();
+                }
+
+                // タイマー作成 (System.Windows.Forms.Timer は UI スレッドのメッセージループに依存する)
+                reminderTimer = new System.Windows.Forms.Timer();
+                reminderTimer.Interval = 1000;
+                reminderTimer.Tick += ReminderTimer_Tick;
+                reminderTimer.Start();
+
+                TimeSpan timeLeft = reminderTime - DateTime.Now;
+                System.Diagnostics.Debug.WriteLine($"[{noteId}] リマインダー復元: {reminderTime:HH:mm:ss} (残り{timeLeft.TotalMinutes:F1}分) Thread={Thread.CurrentThread.ManagedThreadId}");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[{noteId}] リマインダー復元エラー: {ex.Message}");
+            }
+        }
 
         /// <summary>
         /// リマインダーを設定
@@ -50,6 +148,14 @@ namespace StickyNoteApp
                     throw new ArgumentException("時間は24時間(1440分)以内を指定してください。", nameof(minutes));
                 }
 
+                // UI スレッドか確認（SetReminderはUI操作から呼ばれる想定だが念のため）
+                if (this.InvokeRequired)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[{noteId}] SetReminder: InvokeRequired=true, marshaling to UI thread. Thread={Thread.CurrentThread.ManagedThreadId}");
+                    this.BeginInvoke(new Action(() => SetReminder(noteId, content, minutes)));
+                    return;
+                }
+
                 this.noteId = noteId;
                 this.noteContent = content ?? string.Empty;
                 this.reminderTime = DateTime.Now.AddMinutes(minutes);
@@ -59,17 +165,20 @@ namespace StickyNoteApp
                 if (reminderTimer != null)
                 {
                     reminderTimer.Stop();
-                    reminderTimer.Tick -= ReminderTimer_Tick;  // イベント解除
+                    reminderTimer.Tick -= ReminderTimer_Tick; // イベント解除
                     reminderTimer.Dispose();
                 }
 
                 // 新しいタイマーを作成(1秒ごとにチェック)
-                reminderTimer = new Timer();
+                reminderTimer = new System.Windows.Forms.Timer();
                 reminderTimer.Interval = 1000;
                 reminderTimer.Tick += ReminderTimer_Tick;
                 reminderTimer.Start();
 
-                System.Diagnostics.Debug.WriteLine($"[{noteId}] リマインダー設定: {minutes}分後 ({reminderTime:HH:mm:ss})");
+                // 状態変更イベントを発火（保存のため）
+                ReminderStateChanged?.Invoke(this, EventArgs.Empty);
+
+                System.Diagnostics.Debug.WriteLine($"[{noteId}] リマインダー設定: {minutes}分後 ({reminderTime:HH:mm:ss}) Thread={Thread.CurrentThread.ManagedThreadId}");
             }
             catch (Exception ex)
             {
@@ -96,7 +205,11 @@ namespace StickyNoteApp
                 }
 
                 isActive = false;
-                System.Diagnostics.Debug.WriteLine($"[{noteId}] リマインダーキャンセル");
+
+                // 状態変更イベントを発火（保存のため）
+                ReminderStateChanged?.Invoke(this, EventArgs.Empty);
+
+                System.Diagnostics.Debug.WriteLine($"[{noteId}] リマインダーキャンセル Thread={Thread.CurrentThread.ManagedThreadId}");
             }
             catch (Exception ex)
             {
@@ -111,6 +224,8 @@ namespace StickyNoteApp
         {
             try
             {
+                System.Diagnostics.Debug.WriteLine($"[{noteId}] ReminderTimer_Tick Thread={Thread.CurrentThread.ManagedThreadId}");
+
                 if (DateTime.Now >= reminderTime)
                 {
                     // リマインダー時刻に到達
@@ -121,11 +236,22 @@ namespace StickyNoteApp
                     reminderTimer.Tick -= ReminderTimer_Tick; // イベント解除
                     isActive = false;
 
-                    // 通知を表示
-                    ShowNotification();
+                    // 先に状態変更イベント（保存）
+                    ReminderStateChanged?.Invoke(this, EventArgs.Empty);
 
-                    // イベント発火
+                    // 付箋側で最前面化するハンドラを先に実行させるため、ReminderTriggered を先に発火
                     ReminderTriggered?.Invoke(this, EventArgs.Empty);
+
+                    // 通知を表示：UIスレッドで同期的に実行して、上の Activate が反映された直後に MessageBox を出す
+                    if (this.InvokeRequired)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[{noteId}] ReminderTimer_Tick invoking ShowNotification synchronously. Thread={Thread.CurrentThread.ManagedThreadId}");
+                        this.Invoke(new Action(ShowNotification)); // 同期的に UI スレッドで実行
+                    }
+                    else
+                    {
+                        ShowNotification();
+                    }
                 }
             }
             catch (Exception ex)
@@ -144,7 +270,6 @@ namespace StickyNoteApp
                 catch
                 {
                     // タイマー停止にも失敗した場合は何もしない
-
                 }
             }
         }
@@ -159,12 +284,17 @@ namespace StickyNoteApp
                 string preview = string.IsNullOrEmpty(noteContent) ? "(内容なし)" :
                     (noteContent.Length > 30 ? noteContent.Substring(0, 30) + "..." : noteContent);
 
+                System.Diagnostics.Debug.WriteLine($"[{noteId}] ShowNotification: before MessageBox Thread={Thread.CurrentThread.ManagedThreadId}");
+
+                // MessageBox を同期的に表示（UI スレッドで呼ばれる前提）
                 MessageBox.Show(
                     $"リマインダー通知\n\n{preview}",
                     "付箋リマインダー",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information
                 );
+
+                System.Diagnostics.Debug.WriteLine($"[{noteId}] ShowNotification: after MessageBox Thread={Thread.CurrentThread.ManagedThreadId}");
             }
             catch (Exception ex)
             {
@@ -179,6 +309,7 @@ namespace StickyNoteApp
         {
             try
             {
+                System.Diagnostics.Debug.WriteLine($"[{noteId}] Dispose called Hash={this.GetHashCode()} Thread={Thread.CurrentThread.ManagedThreadId}");
                 if (reminderTimer != null)
                 {
                     reminderTimer.Stop();
@@ -187,16 +318,21 @@ namespace StickyNoteApp
                     reminderTimer = null;
                 }
                 isActive = false;
+
+                try { Interlocked.Decrement(ref instanceCount); } catch { }
+                System.Diagnostics.Debug.WriteLine($"[ReminderManager] instanceCount(after Dispose)={instanceCount}");
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[{noteId}] Disposeエラー: {ex.Message}");
             }
+            finally
+            {
+                // base.Dispose() は Designer にも定義されている可能性があるため呼ばない（partial の実装に依存）
+            }
         }
 
-        // ============================================
-        // StickyNoteForm.csから移動
-        // ============================================
+        // --- 以下は既存のダイアログ / ヘルパーコード（省略しない） ---
 
         /// <summary>
         /// カスタム時間設定ダイアログを表示してリマインダーを設定
@@ -287,6 +423,7 @@ namespace StickyNoteApp
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
+
         /// <summary>
         /// リマインダーキャンセルダイアログを表示
         /// </summary>

@@ -429,12 +429,47 @@ namespace StickyNoteApp
         private void InitializeReminder()
         {
             reminderManager = new ReminderManager();
+
+            // リマインダー通知イベントの登録
             reminderManager.ReminderTriggered += (s, e) =>
             {
                 this.TopMost = true;
                 this.Activate();
                 System.Diagnostics.Debug.WriteLine($"[{NoteId}] リマインダー通知表示");
             };
+
+            // リマインダー状態変更イベント（自動保存のため）
+            reminderManager.ReminderStateChanged += (s, e) =>
+            {
+                needsSave = true;
+                System.Diagnostics.Debug.WriteLine($"[{NoteId}] リマインダー状態変更");
+            };
+        }
+
+        // DBから読み込んだリマインダー情報を設定
+
+        /// <summary>
+        /// リマインダー情報を取得（データベース保存用）
+        /// </summary>
+        public ReminderInfo GetReminderInfo()
+        {
+            if (reminderManager != null)
+            {
+                return reminderManager.GetReminderInfo();
+            }
+            return new ReminderInfo { IsActive = false };
+        }
+
+        /// <summary>
+        /// リマインダーを復元（データベースからの読み込み時用）
+        /// </summary>
+        public void RestoreReminder(DateTime reminderTime)
+        {
+            if (reminderManager != null && reminderTime > DateTime.Now)
+            {
+                reminderManager.RestoreReminder(NoteId, txtNote.Text, reminderTime);
+                System.Diagnostics.Debug.WriteLine($"[{NoteId}] リマインダー復元完了: {reminderTime:yyyy-MM-dd HH:mm:ss}");
+            }
         }
 
         /// <summary>

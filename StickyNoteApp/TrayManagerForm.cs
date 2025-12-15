@@ -65,7 +65,6 @@ namespace StickyNoteApp
             toggleAllNotesMenuItem.ShortcutKeyDisplayString = "Ctrl+Shift+H";
             toggleAllNotesMenuItem.Click += OnShowHideAllStickyNotesClicked;
             trayMenu.Items.Add(toggleAllNotesMenuItem);
-            
             // DB整合性チェック（デバッグ用。のちに削除予定）
             trayMenu.Items.Add(new ToolStripSeparator()); // 区切り線
             trayMenu.Items.Add("データベース整合性チェック", null, OnDatabaseIntegrityCheckClicked);
@@ -110,6 +109,7 @@ namespace StickyNoteApp
         {
             // 復元した付箋の数をカウント
             int restoredCount = 0;
+            int reminderRestoredCount = 0; // リマインダー復元数
 
             try
             {
@@ -165,7 +165,70 @@ namespace StickyNoteApp
                             note.LoadCapturedImage(imagePath);
                         }
 
-                        // 付箋をリストに追加
+                        // ============================================
+                        // リマインダー復元処理
+                        // ============================================
+                        try
+                        {
+                            // ReminderActiveカラムが存在するかチェック
+                            int reminderActiveOrdinal = -1;
+                            int reminderTimeOrdinal = -1;
+
+                            try
+                            {
+                                reminderActiveOrdinal = reader.GetOrdinal("ReminderActive");
+                                reminderTimeOrdinal = reader.GetOrdinal("ReminderTime");
+                            }
+                            catch
+                            {
+                                // カラムが存在しない場合は何もしない（初回起動時など）
+                                System.Diagnostics.Debug.WriteLine($"[{id}] リマインダーカラムが存在しません（初回起動）");
+                            }
+
+                            if (reminderActiveOrdinal >= 0 && reminderTimeOrdinal >= 0)
+                            {
+                                bool reminderActive = !reader.IsDBNull(reminderActiveOrdinal) &&
+                                                     Convert.ToInt32(reader["ReminderActive"]) == 1;
+
+                                if (reminderActive)
+                                {
+                                    string reminderTimeStr = reader["ReminderTime"]?.ToString();
+
+                                    if (!string.IsNullOrEmpty(reminderTimeStr))
+                                    {
+                                        DateTime reminderTime = DateTime.Parse(reminderTimeStr);
+
+                                        // 未来の時刻のみ復元
+                                        if (reminderTime > DateTime.Now)
+                                        {
+                                            note.RestoreReminder(reminderTime);
+                                            reminderRestoredCount++;
+
+                                            TimeSpan timeLeft = reminderTime - DateTime.Now;
+                                            System.Diagnostics.Debug.WriteLine(
+                                                $"  → リマインダー復元: {reminderTime:yyyy-MM-dd HH:mm:ss} " +
+                                                $"(残り {timeLeft.TotalMinutes:F1}分)"
+                                            );
+                                        }
+                                        else
+                                        {
+                                            System.Diagnostics.Debug.WriteLine(
+                                                $"  → リマインダー時刻が過去のため無効化: {reminderTime:yyyy-MM-dd HH:mm:ss}"
+                                            );
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        catch (Exception reminderEx)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[{id}] リマインダー復元エラー: {reminderEx.Message}");
+                            // リマインダーの復元に失敗しても、付箋自体は表示する
+                        }
+                        // ============================================
+                        // リマインダー復元処理ここまで
+                        // ============================================
+
                         allNotes.Add(note);
 
                         // 付箋が閉じられたらリストから削除
@@ -180,7 +243,7 @@ namespace StickyNoteApp
                     }
                 }
 
-                System.Diagnostics.Debug.WriteLine($"=== 付箋復元完了: {restoredCount}件 ===");
+                System.Diagnostics.Debug.WriteLine($"=== 付箋復元完了: {restoredCount}件（リマインダー復元: {reminderRestoredCount}件） ===");
             }
             catch (Exception ex)
             {
@@ -260,7 +323,6 @@ namespace StickyNoteApp
                 overlay.CaptureCompleted += (s, args) =>
                 {
                     System.Diagnostics.Debug.WriteLine($"キャプチャ完了: {args.CapturedImage.Width}x{args.CapturedImage.Height}");
-
                     // テスト用：キャプチャした画像を表示
                     ShowCapturedImageTest(args.CapturedImage);
                 };
@@ -455,7 +517,6 @@ namespace StickyNoteApp
 
         /// <summary>
         /// フォームクローズ時の処理
-        /// 
         /// </summary>
         protected override void OnFormClosing(FormClosingEventArgs e)
         {

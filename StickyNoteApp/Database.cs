@@ -57,11 +57,24 @@ namespace StickyNoteApp
                     }
                     else
                     {
-                        // 既存のテーブルにImagePathカランがあるか確認
+                        // 既存のテーブルにカラムを追加
                         if (!ColumnExists(con, "StickyNotes", "ImagePath"))
                         {
                             System.Diagnostics.Debug.WriteLine("ImagePathカラムを追加します。");
-                            AddImagePathColumn(con);
+                            AddColumn(con, "StickyNotes", "ImagePath", "TEXT");
+                        }
+
+                        // リマインダー関連カラムを追加
+                        if (!ColumnExists(con, "StickyNotes", "ReminderActive"))
+                        {
+                            System.Diagnostics.Debug.WriteLine("ReminderActiveカラムを追加します。");
+                            AddColumn(con, "StickyNotes", "ReminderActive", "INTEGER DEFAULT 0");
+                        }
+
+                        if (!ColumnExists(con, "StickyNotes", "ReminderTime"))
+                        {
+                            System.Diagnostics.Debug.WriteLine("ReminderTimeカラムを追加します。");
+                            AddColumn(con, "StickyNotes", "ReminderTime", "TEXT");
                         }
                     }
                 }
@@ -91,6 +104,7 @@ namespace StickyNoteApp
                 }
             }
         }
+
         /// <summary>
         /// カラムの存在確認
         /// </summary>
@@ -114,20 +128,20 @@ namespace StickyNoteApp
         }
 
         /// <summary>
-        /// ImagePathカラムを追加（既存テーブル用）
+        /// カラムを追加（汎用）
         /// </summary>
-        private static void AddImagePathColumn(SqliteConnection con)
+        private static void AddColumn(SqliteConnection con, string tableName, string columnName, string columnType)
         {
-            string sql = "ALTER TABLE StickyNotes ADD COLUMN ImagePath TEXT";
+            string sql = $"ALTER TABLE {tableName} ADD COLUMN {columnName} {columnType}";
             using (var cmd = new SqliteCommand(sql, con))
             {
                 cmd.ExecuteNonQuery();
-                System.Diagnostics.Debug.WriteLine("ImagePathカラム追加完了");
+                System.Diagnostics.Debug.WriteLine($"{columnName}カラム追加完了");
             }
         }
 
         /// <summary>
-        /// StickyNotesテーブルの作成
+        /// StickyNotesテーブルの作成(リマインダー関連追加)
         /// </summary>
         private static void CreateStickyNotesTable(SqliteConnection con)
         {
@@ -145,6 +159,8 @@ namespace StickyNoteApp
                     TopMostFlag INTEGER,
                     DeleteFlag INTEGER DEFAULT 0,
                     ImagePath TEXT,
+                    ReminderActive INTEGER DEFAULT 0,
+                    ReminderTime TEXT,
                     CreatedAt TEXT,
                     UpdatedAt TEXT
                 );
@@ -156,9 +172,8 @@ namespace StickyNoteApp
             }
         }
 
-
         /// <summary>
-        // SQLパラメータの設定（INSERT or UPDATE 用）
+        /// SQLパラメータの設定（INSERT or UPDATE 用）
         /// </summary>
         public static void SaveOrUpdate(StickyNoteForm note)
         {
@@ -168,12 +183,14 @@ namespace StickyNoteApp
                 {
                     con.Open();
 
-                    // UPSERTクエリ
+                    // UPSERTクエリ(リマインダー関連追加）
                     string sql = @"
                         INSERT INTO StickyNotes
-                        (Id, Content, PosX, PosY, Width, Height, BgR, BgG, BgB, TopMostFlag, DeleteFlag, ImagePath, CreatedAt, UpdatedAt)
+                        (Id, Content, PosX, PosY, Width, Height, BgR, BgG, BgB, TopMostFlag, DeleteFlag, ImagePath, 
+                         ReminderActive, ReminderTime, CreatedAt, UpdatedAt)
                         VALUES
-                        ($Id, $Content, $PosX, $PosY, $Width, $Height, $BgR, $BgG, $BgB, $TopMostFlag, 0, $ImagePath, $CreatedAt, $UpdatedAt)
+                        ($Id, $Content, $PosX, $PosY, $Width, $Height, $BgR, $BgG, $BgB, $TopMostFlag, 0, $ImagePath,
+                         $ReminderActive, $ReminderTime, $CreatedAt, $UpdatedAt)
                         ON CONFLICT(Id) DO UPDATE SET
                             Content = excluded.Content,
                             PosX = excluded.PosX,
@@ -185,6 +202,8 @@ namespace StickyNoteApp
                             BgB = excluded.BgB,
                             TopMostFlag = excluded.TopMostFlag,
                             ImagePath = excluded.ImagePath,
+                            ReminderActive = excluded.ReminderActive,
+                            ReminderTime = excluded.ReminderTime,
                             UpdatedAt = excluded.UpdatedAt;
                     ";
 
@@ -202,6 +221,12 @@ namespace StickyNoteApp
                         cmd.Parameters.AddWithValue("$BgB", note.BackColor.B);
                         cmd.Parameters.AddWithValue("$TopMostFlag", note.TopMost ? 1 : 0);
                         cmd.Parameters.AddWithValue("$ImagePath", string.IsNullOrEmpty(note.CapturedImagePath) ? "" : note.CapturedImagePath); // 空文字対応
+
+                        // リマインダー情報を保存
+                        var reminderInfo = note.GetReminderInfo();
+                        cmd.Parameters.AddWithValue("$ReminderActive", reminderInfo.IsActive ? 1 : 0);
+                        cmd.Parameters.AddWithValue("$ReminderTime", reminderInfo.IsActive ? reminderInfo.ReminderTime.ToString("yyyy-MM-dd HH:mm:ss") : "");
+
                         cmd.Parameters.AddWithValue("$CreatedAt", note.CreatedAt);
                         cmd.Parameters.AddWithValue("$UpdatedAt", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
 
@@ -230,7 +255,6 @@ namespace StickyNoteApp
 
                     using (var cmd = new SqliteCommand(sql, con))
                     {
-                        // 
                         cmd.Parameters.AddWithValue("$Id", id);
                         cmd.Parameters.AddWithValue("$UpdatedAt", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
                         cmd.ExecuteNonQuery();
