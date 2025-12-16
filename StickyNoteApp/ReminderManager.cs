@@ -20,9 +20,12 @@ namespace StickyNoteApp
     public partial class ReminderManager : Form
     {
         // 定数定義
-        private const int TIMER_INTERVAL_MS = 1000; // タイマーチェック間隔（ミリ秒）
-        private const int MIN_REMINDER_MINUTES = 1; // 最小リマインダー時間（分）
-        private const int MAX_REMINDER_MINUTES = 1440; // 最大リマインダー時間（24時間）
+        private const int TIMER_INTERVAL_MS = 1000; // リマインダー時刻を確認する間隔（ミリ秒）
+        private const int MIN_REMINDER_MINUTES = 1; // リマインダーとして設定できる最小時間（分）
+        private const int MINUTES_PER_HOUR = 60; // 1時間あたりの分数（計算用）
+        private const int MAX_REMINDER_HOURS = 24; // リマインダーとして設定できる最大時間（24時間）
+        private const int MAX_REMINDER_MINUTES = MAX_REMINDER_HOURS * MINUTES_PER_HOUR; // 設定可能な最大時間（1440分＝24時間ちょうどまでOK）
+
         // Timerの宣言を明示的にSystem.Windows.Forms.Timerに変更
         private System.Windows.Forms.Timer reminderTimer;
         private DateTime reminderTime;
@@ -128,19 +131,20 @@ namespace StickyNoteApp
             try
             {
                 // 入力値の検証
+                // 付箋IDが空の場合はエラー
                 if (string.IsNullOrEmpty(noteId))
                 {
                     throw new ArgumentException("付箋IDが指定されていません。", nameof(noteId));
                 }
 
-                if (minutes < MIN_REMINDER_MINUTES)
+                if (minutes < MIN_REMINDER_MINUTES) // 1分未満の場合はエラー
                 {
                     throw new ArgumentException($"時間は{MIN_REMINDER_MINUTES}分以上を指定してください。", nameof(minutes));
                 }
 
-                if (minutes > MAX_REMINDER_MINUTES) // 24時間以内
+                if (minutes > MAX_REMINDER_MINUTES) // 最大24時間（1440分）を超える場合はエラー
                 {
-                    throw new ArgumentException($"時間は24時間({MAX_REMINDER_MINUTES}分)以内を指定してください。", nameof(minutes));
+                    throw new ArgumentException($"時間は{MAX_REMINDER_HOURS}時間({MAX_REMINDER_MINUTES}分)以内を指定してください。", nameof(minutes));
                 }
 
                 this.noteId = noteId;
@@ -318,7 +322,7 @@ namespace StickyNoteApp
                     {
                         var hours = (int)inputForm.Controls["NumericUpDownHours"].Tag;
                         var minutes = (int)inputForm.Controls["NumericUpDownMinutes"].Tag;
-                        int totalMinutes = (hours * 60) + minutes;
+                        int totalMinutes = (hours * MINUTES_PER_HOUR) + minutes;
 
                         // 0時間0分のチェック
                         if (totalMinutes < MIN_REMINDER_MINUTES)
@@ -363,8 +367,8 @@ namespace StickyNoteApp
                 DateTime reminderTime = DateTime.Now.AddMinutes(minutes);
 
                 // 時間と分を計算して表示
-                int hours = minutes / 60;
-                int mins = minutes % 60;
+                int hours = minutes / MINUTES_PER_HOUR;
+                int mins = minutes % MINUTES_PER_HOUR;
 
                 string timeText;
                 if (hours > 0 && mins > 0)
