@@ -19,6 +19,10 @@ namespace StickyNoteApp
     /// </summary>
     public partial class ReminderManager : Form
     {
+        // 定数定義
+        private const int TIMER_INTERVAL_MS = 1000; // タイマーチェック間隔（ミリ秒）
+        private const int MIN_REMINDER_MINUTES = 1; // 最小リマインダー時間（分）
+        private const int MAX_REMINDER_MINUTES = 1440; // 最大リマインダー時間（24時間）
         // Timerの宣言を明示的にSystem.Windows.Forms.Timerに変更
         private System.Windows.Forms.Timer reminderTimer;
         private DateTime reminderTime;
@@ -97,13 +101,13 @@ namespace StickyNoteApp
                 if (reminderTimer != null)
                 {
                     reminderTimer.Stop();
-                    reminderTimer.Tick -= ReminderTimer_Tick;
+                    reminderTimer.Tick -= ReminderTimer_Tick; // イベント解除
                     reminderTimer.Dispose();
                 }
 
                 // タイマー作成
                 reminderTimer = new System.Windows.Forms.Timer();
-                reminderTimer.Interval = 1000; // 編集要
+                reminderTimer.Interval = TIMER_INTERVAL_MS;
                 reminderTimer.Tick += ReminderTimer_Tick;
                 reminderTimer.Start();
 
@@ -129,14 +133,14 @@ namespace StickyNoteApp
                     throw new ArgumentException("付箋IDが指定されていません。", nameof(noteId));
                 }
 
-                if (minutes <= 0)
+                if (minutes < MIN_REMINDER_MINUTES)
                 {
-                    throw new ArgumentException("時間は1分以上を指定してください。", nameof(minutes));
+                    throw new ArgumentException($"時間は{MIN_REMINDER_MINUTES}分以上を指定してください。", nameof(minutes));
                 }
 
-                if (minutes > 1440) // 24時間以内
+                if (minutes > MAX_REMINDER_MINUTES) // 24時間以内
                 {
-                    throw new ArgumentException("時間は24時間(1440分)以内を指定してください。", nameof(minutes));
+                    throw new ArgumentException($"時間は24時間({MAX_REMINDER_MINUTES}分)以内を指定してください。", nameof(minutes));
                 }
 
                 this.noteId = noteId;
@@ -154,11 +158,11 @@ namespace StickyNoteApp
 
                 // 新しいタイマーを作成(1秒ごとにチェック)
                 reminderTimer = new System.Windows.Forms.Timer();
-                reminderTimer.Interval = 1000; // 編集要
+                reminderTimer.Interval = TIMER_INTERVAL_MS;
                 reminderTimer.Tick += ReminderTimer_Tick;
                 reminderTimer.Start();
 
-                // 状態変更イベントを発火（保存のため）→編集要：変更しているタイミングで保存する処理を呼ぶで作る
+                // 状態変更イベントを発火（保存のため） →編集要：変更しているタイミングで保存する処理を呼ぶで作る
                 ReminderStateChanged?.Invoke(this, EventArgs.Empty);
 
                 System.Diagnostics.Debug.WriteLine($"[{noteId}] リマインダー設定: {minutes}分後 ({reminderTime:HH:mm:ss}) Thread={Thread.CurrentThread.ManagedThreadId}");
@@ -182,14 +186,14 @@ namespace StickyNoteApp
                 if (reminderTimer != null)
                 {
                     reminderTimer.Stop();
-                    reminderTimer.Tick -= ReminderTimer_Tick;
+                    reminderTimer.Tick -= ReminderTimer_Tick; // イベント解除
                     reminderTimer.Dispose();
                     reminderTimer = null;
                 }
 
                 isActive = false;
 
-                // 状態変更イベントを発火（保存のため）→編集要：変更しているタイミングで保存する処理を呼ぶで作る
+                // 状態変更イベントを発火（保存のため） →編集要：変更しているタイミングで保存する処理を呼ぶで作る
                 ReminderStateChanged?.Invoke(this, EventArgs.Empty);
 
                 System.Diagnostics.Debug.WriteLine($"[{noteId}] リマインダーキャンセル Thread={Thread.CurrentThread.ManagedThreadId}");
@@ -216,10 +220,10 @@ namespace StickyNoteApp
 
                     // タイマー停止
                     reminderTimer.Stop();
-                    reminderTimer.Tick -= ReminderTimer_Tick;
+                    reminderTimer.Tick -= ReminderTimer_Tick; // イベント解除
                     isActive = false;
 
-                    // 先に状態変更イベント（保存）→編集要：変更しているタイミングで保存する処理を呼ぶで作る
+                    // 先に状態変更イベント（保存） →編集要：変更しているタイミングで保存する処理を呼ぶで作る
                     ReminderStateChanged?.Invoke(this, EventArgs.Empty);
 
                     // 付箋側で最前面化するハンドラを先に実行させるため、ReminderTriggered を先に発火
@@ -256,13 +260,10 @@ namespace StickyNoteApp
         {
             try
             {
-                string preview = string.IsNullOrEmpty(noteContent) ? "(内容なし)" :
-                    (noteContent.Length > 30 ? noteContent.Substring(0, 30) + "..." : noteContent);
-
                 System.Diagnostics.Debug.WriteLine($"[{noteId}] ShowNotification Thread={Thread.CurrentThread.ManagedThreadId}");
 
                 MessageBox.Show(
-                    $"リマインダー通知\n\n{preview}",
+                    $"リマインダー通知\n\n{noteContent}",
                     "付箋リマインダー",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information
@@ -302,7 +303,7 @@ namespace StickyNoteApp
             }
         }
 
-        // --- 以下は既存のダイアログ / ヘルパーコード（省略しない） ---
+        // --- 以下は既存のダイアログ / ヘルパーコード （省略しない）---
 
         /// <summary>
         /// カスタム時間設定ダイアログを表示してリマインダーを設定
@@ -320,9 +321,9 @@ namespace StickyNoteApp
                         int totalMinutes = (hours * 60) + minutes;
 
                         // 0時間0分のチェック
-                        if (totalMinutes <= 0)
+                        if (totalMinutes < MIN_REMINDER_MINUTES)
                         {
-                            MessageBox.Show("時間は1分以上を指定してください。", "入力エラー",
+                            MessageBox.Show($"時間は{MIN_REMINDER_MINUTES}分以上を指定してください。", "入力エラー",
                                 MessageBoxButtons.OK, MessageBoxIcon.Warning);
                             return;
                         }
