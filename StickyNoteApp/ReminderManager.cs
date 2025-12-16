@@ -29,8 +29,8 @@ namespace StickyNoteApp
         // インスタンス管理用（デバッグ確認用）
         private static int instanceCount = 0;
 
-        public event EventHandler ReminderTriggered;
-        public event EventHandler ReminderStateChanged; // リマインダー状態変更イベント
+        public event EventHandler ReminderTriggered; // リマインダー発火イベント
+        public event EventHandler ReminderStateChanged; // リマインダー状態変更イベント(編集要：変更しているタイミングで保存する処理を呼ぶで作る）
 
         /// <summary>
         /// リマインダーが設定されているか
@@ -76,20 +76,11 @@ namespace StickyNoteApp
 
         /// <summary>
         /// リマインダーを復元（データベースからの読み込み時用）
-        /// ※ UI スレッドで実行されていることを保証（必要なら marshal する）
         /// </summary>
         public void RestoreReminder(string noteId, string content, DateTime reminderTime)
         {
             try
             {
-                // UI スレッドでない場合は marshal して再実行する
-                if (this.InvokeRequired)
-                {
-                    System.Diagnostics.Debug.WriteLine($"[{noteId}] RestoreReminder: InvokeRequired=true, marshaling to UI thread. Thread={Thread.CurrentThread.ManagedThreadId}");
-                    this.BeginInvoke(new Action(() => RestoreReminder(noteId, content, reminderTime)));
-                    return;
-                }
-
                 // 過去の時刻は無視
                 if (reminderTime <= DateTime.Now)
                 {
@@ -110,9 +101,9 @@ namespace StickyNoteApp
                     reminderTimer.Dispose();
                 }
 
-                // タイマー作成 (System.Windows.Forms.Timer は UI スレッドのメッセージループに依存する)
+                // タイマー作成
                 reminderTimer = new System.Windows.Forms.Timer();
-                reminderTimer.Interval = 1000;
+                reminderTimer.Interval = 1000; // 編集要
                 reminderTimer.Tick += ReminderTimer_Tick;
                 reminderTimer.Start();
 
@@ -148,14 +139,6 @@ namespace StickyNoteApp
                     throw new ArgumentException("時間は24時間(1440分)以内を指定してください。", nameof(minutes));
                 }
 
-                // UI スレッドか確認（SetReminderはUI操作から呼ばれる想定だが念のため）
-                if (this.InvokeRequired)
-                {
-                    System.Diagnostics.Debug.WriteLine($"[{noteId}] SetReminder: InvokeRequired=true, marshaling to UI thread. Thread={Thread.CurrentThread.ManagedThreadId}");
-                    this.BeginInvoke(new Action(() => SetReminder(noteId, content, minutes)));
-                    return;
-                }
-
                 this.noteId = noteId;
                 this.noteContent = content ?? string.Empty;
                 this.reminderTime = DateTime.Now.AddMinutes(minutes);
@@ -171,11 +154,11 @@ namespace StickyNoteApp
 
                 // 新しいタイマーを作成(1秒ごとにチェック)
                 reminderTimer = new System.Windows.Forms.Timer();
-                reminderTimer.Interval = 1000;
+                reminderTimer.Interval = 1000; // 編集要
                 reminderTimer.Tick += ReminderTimer_Tick;
                 reminderTimer.Start();
 
-                // 状態変更イベントを発火（保存のため）
+                // 状態変更イベントを発火（保存のため）→編集要：変更しているタイミングで保存する処理を呼ぶで作る
                 ReminderStateChanged?.Invoke(this, EventArgs.Empty);
 
                 System.Diagnostics.Debug.WriteLine($"[{noteId}] リマインダー設定: {minutes}分後 ({reminderTime:HH:mm:ss}) Thread={Thread.CurrentThread.ManagedThreadId}");
@@ -199,14 +182,14 @@ namespace StickyNoteApp
                 if (reminderTimer != null)
                 {
                     reminderTimer.Stop();
-                    reminderTimer.Tick -= ReminderTimer_Tick; // イベント解除
+                    reminderTimer.Tick -= ReminderTimer_Tick;
                     reminderTimer.Dispose();
                     reminderTimer = null;
                 }
 
                 isActive = false;
 
-                // 状態変更イベントを発火（保存のため）
+                // 状態変更イベントを発火（保存のため）→編集要：変更しているタイミングで保存する処理を呼ぶで作る
                 ReminderStateChanged?.Invoke(this, EventArgs.Empty);
 
                 System.Diagnostics.Debug.WriteLine($"[{noteId}] リマインダーキャンセル Thread={Thread.CurrentThread.ManagedThreadId}");
@@ -233,25 +216,17 @@ namespace StickyNoteApp
 
                     // タイマー停止
                     reminderTimer.Stop();
-                    reminderTimer.Tick -= ReminderTimer_Tick; // イベント解除
+                    reminderTimer.Tick -= ReminderTimer_Tick;
                     isActive = false;
 
-                    // 先に状態変更イベント（保存）
+                    // 先に状態変更イベント（保存）→編集要：変更しているタイミングで保存する処理を呼ぶで作る
                     ReminderStateChanged?.Invoke(this, EventArgs.Empty);
 
                     // 付箋側で最前面化するハンドラを先に実行させるため、ReminderTriggered を先に発火
                     ReminderTriggered?.Invoke(this, EventArgs.Empty);
 
-                    // 通知を表示：UIスレッドで同期的に実行して、上の Activate が反映された直後に MessageBox を出す
-                    if (this.InvokeRequired)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[{noteId}] ReminderTimer_Tick invoking ShowNotification synchronously. Thread={Thread.CurrentThread.ManagedThreadId}");
-                        this.Invoke(new Action(ShowNotification)); // 同期的に UI スレッドで実行
-                    }
-                    else
-                    {
-                        ShowNotification();
-                    }
+                    // 通知を表示
+                    ShowNotification();
                 }
             }
             catch (Exception ex)
@@ -284,9 +259,8 @@ namespace StickyNoteApp
                 string preview = string.IsNullOrEmpty(noteContent) ? "(内容なし)" :
                     (noteContent.Length > 30 ? noteContent.Substring(0, 30) + "..." : noteContent);
 
-                System.Diagnostics.Debug.WriteLine($"[{noteId}] ShowNotification: before MessageBox Thread={Thread.CurrentThread.ManagedThreadId}");
+                System.Diagnostics.Debug.WriteLine($"[{noteId}] ShowNotification Thread={Thread.CurrentThread.ManagedThreadId}");
 
-                // MessageBox を同期的に表示（UI スレッドで呼ばれる前提）
                 MessageBox.Show(
                     $"リマインダー通知\n\n{preview}",
                     "付箋リマインダー",
@@ -294,7 +268,7 @@ namespace StickyNoteApp
                     MessageBoxIcon.Information
                 );
 
-                System.Diagnostics.Debug.WriteLine($"[{noteId}] ShowNotification: after MessageBox Thread={Thread.CurrentThread.ManagedThreadId}");
+                System.Diagnostics.Debug.WriteLine($"[{noteId}] ShowNotification完了");
             }
             catch (Exception ex)
             {
@@ -326,10 +300,6 @@ namespace StickyNoteApp
             {
                 System.Diagnostics.Debug.WriteLine($"[{noteId}] Disposeエラー: {ex.Message}");
             }
-            finally
-            {
-                // base.Dispose() は Designer にも定義されている可能性があるため呼ばない（partial の実装に依存）
-            }
         }
 
         // --- 以下は既存のダイアログ / ヘルパーコード（省略しない） ---
@@ -345,8 +315,8 @@ namespace StickyNoteApp
                 {
                     if (inputForm.ShowDialog() == DialogResult.OK)
                     {
-                        var hours = (int)inputForm.Controls["numericUpDownHours"].Tag;
-                        var minutes = (int)inputForm.Controls["numericUpDownMinutes"].Tag;
+                        var hours = (int)inputForm.Controls["NumericUpDownHours"].Tag;
+                        var minutes = (int)inputForm.Controls["NumericUpDownMinutes"].Tag;
                         int totalMinutes = (hours * 60) + minutes;
 
                         // 0時間0分のチェック

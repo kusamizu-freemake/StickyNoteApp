@@ -11,16 +11,16 @@ namespace StickyNoteApp
     /// </summary>
     public partial class TrayManagerForm : Form
     {
-        private static NotifyIcon trayIcon; // タスクトレイアイコン
-        private ContextMenuStrip trayMenu; // トレイメニュー
-        private ToolStripMenuItem toggleAllNotesMenuItem; // すべての付箋表示/非表示メニュー
+        private static NotifyIcon TrayIcon; // タスクトレイアイコン
+        private ContextMenuStrip TrayMenu; // トレイメニュー
+        private ToolStripMenuItem ToggleAllNotesMenuItem; // すべての付箋表示/非表示メニュー
 
         // 全付箋を追跡するリスト
         private List<StickyNoteForm> allNotes = new List<StickyNoteForm>();
         private bool allNotesVisible = true;
 
         // ホットキーマネージャー
-        private HotkeyManager hotkeyManager;
+        private HotkeyManager HotkeyManager;
 
         // 常駐開始
         public TrayManagerForm()
@@ -36,9 +36,9 @@ namespace StickyNoteApp
             System.Diagnostics.Debug.WriteLine("TrayManagerForm: トレイアイコン初期化完了");
 
             // ホットキーマネージャーの初期化
-            hotkeyManager = new HotkeyManager();
-            hotkeyManager.NewNoteRequested += (s, e) => OnCreateNoteClicked(s, e);
-            hotkeyManager.ToggleNotesRequested += (s, e) => OnShowHideAllStickyNotesClicked(s, e);
+            HotkeyManager = new HotkeyManager();
+            HotkeyManager.NewNoteRequested += (s, e) => OnCreateNoteClicked(s, e);
+            HotkeyManager.ToggleNotesRequested += (s, e) => OnShowHideAllStickyNotesClicked(s, e);
 
             System.Diagnostics.Debug.WriteLine("TrayManagerForm: ホットキーマネージャー初期化完了");
 
@@ -53,42 +53,42 @@ namespace StickyNoteApp
         private void InitializeTray()
         {
             // 右クリック時に表示されるメニュー
-            trayMenu = new ContextMenuStrip();
+            TrayMenu = new ContextMenuStrip();
 
             // メニュー項目にショートカットキーを表示
-            var newNoteItem = new ToolStripMenuItem("新しい付箋を作成");
-            newNoteItem.ShortcutKeyDisplayString = "Ctrl+Shift+N";
-            newNoteItem.Click += OnCreateNoteClicked;
-            trayMenu.Items.Add(newNoteItem);
+            var NewNoteItem = new ToolStripMenuItem("新しい付箋を作成");
+            NewNoteItem.ShortcutKeyDisplayString = "Ctrl+Shift+N";
+            NewNoteItem.Click += OnCreateNoteClicked;
+            TrayMenu.Items.Add(NewNoteItem);
 
-            toggleAllNotesMenuItem = new ToolStripMenuItem("すべての付箋を非表示");
-            toggleAllNotesMenuItem.ShortcutKeyDisplayString = "Ctrl+Shift+H";
-            toggleAllNotesMenuItem.Click += OnShowHideAllStickyNotesClicked;
-            trayMenu.Items.Add(toggleAllNotesMenuItem);
+            ToggleAllNotesMenuItem = new ToolStripMenuItem("すべての付箋を非表示");
+            ToggleAllNotesMenuItem.ShortcutKeyDisplayString = "Ctrl+Shift+H";
+            ToggleAllNotesMenuItem.Click += OnShowHideAllStickyNotesClicked;
+            TrayMenu.Items.Add(ToggleAllNotesMenuItem);
             // DB整合性チェック（デバッグ用。のちに削除予定）
-            trayMenu.Items.Add(new ToolStripSeparator()); // 区切り線
-            trayMenu.Items.Add("データベース整合性チェック", null, OnDatabaseIntegrityCheckClicked);
+            TrayMenu.Items.Add(new ToolStripSeparator()); // 区切り線
+            TrayMenu.Items.Add("データベース整合性チェック", null, OnDatabaseIntegrityCheckClicked);
 
             // 画面キャプチャテスト
             var captureTestItem = new ToolStripMenuItem("画面キャプチャテスト");
             captureTestItem.Click += OnCaptureTestClicked;
-            trayMenu.Items.Add(captureTestItem);
+            TrayMenu.Items.Add(captureTestItem);
 
             // 設定（未実装）
-            trayMenu.Items.Add("設定", null, OnSettingClicked);
-            trayMenu.Items.Add(new ToolStripSeparator()); // 区切り線
-            trayMenu.Items.Add("アプリを終了", null, OnExitClicked);
+            TrayMenu.Items.Add("設定", null, OnSettingClicked);
+            TrayMenu.Items.Add(new ToolStripSeparator()); // 区切り線
+            TrayMenu.Items.Add("アプリを終了", null, OnExitClicked);
 
             // タスクトレイアイコンの設定
-            trayIcon = new NotifyIcon
+            TrayIcon = new NotifyIcon
             {
                 Icon = SystemIcons.Information,
                 Visible = true,
-                ContextMenuStrip = trayMenu,
+                ContextMenuStrip = TrayMenu,
                 Text = "付箋アプリ\nCtrl+Shift+N: 新規付箋\nCtrl+Shift+H: 表示/非表示"
             };
 
-            trayIcon.MouseClick += TrayIcon_MouseClick;
+            TrayIcon.MouseClick += TrayIcon_MouseClick;
         }
 
         /// <summary>
@@ -98,7 +98,7 @@ namespace StickyNoteApp
         {
             if (e.Button == MouseButtons.Left)
             {
-                trayIcon.ShowBalloonTip(1000, "付箋アプリ", "タスクトレイで動作中", ToolTipIcon.Info);
+                TrayIcon.ShowBalloonTip(1000, "付箋アプリ", "タスクトレイで動作中", ToolTipIcon.Info);
             }
         }
 
@@ -291,7 +291,7 @@ namespace StickyNoteApp
                     note.Hide();
                 }
                 allNotesVisible = false;
-                toggleAllNotesMenuItem.Text = "すべての付箋を表示";
+                ToggleAllNotesMenuItem.Text = "すべての付箋を表示";
                 System.Diagnostics.Debug.WriteLine($"すべての付箋を非表示にしました ({allNotes.Count}件)");
             }
             else
@@ -302,7 +302,7 @@ namespace StickyNoteApp
                     note.Show();
                 }
                 allNotesVisible = true;
-                toggleAllNotesMenuItem.Text = "すべての付箋を非表示";
+                ToggleAllNotesMenuItem.Text = "すべての付箋を非表示";
                 System.Diagnostics.Debug.WriteLine($"すべての付箋を表示しました ({allNotes.Count}件)");
             }
         }
@@ -473,7 +473,7 @@ namespace StickyNoteApp
         private void OnExitClicked(object sender, EventArgs e)
         {
             System.Diagnostics.Debug.WriteLine("アプリケーション終了");
-            trayIcon.Visible = false;
+            TrayIcon.Visible = false;
             Application.Exit();
         }
 
@@ -486,10 +486,10 @@ namespace StickyNoteApp
             System.Diagnostics.Debug.WriteLine("OnShown: フォームを非表示にします");
 
             // ホットキーを登録
-            if (hotkeyManager.RegisterHotkeys(this.Handle))
+            if (HotkeyManager.RegisterHotkeys(this.Handle))
             {
                 System.Diagnostics.Debug.WriteLine("ホットキー登録成功");
-                trayIcon.ShowBalloonTip(2000, "付箋アプリ", "ショートカットキー:\nCtrl+Shift+N: 新しい付箋\nCtrl+Shift+H: 付箋の表示/非表示", ToolTipIcon.Info);
+                TrayIcon.ShowBalloonTip(2000, "付箋アプリ", "ショートカットキー:\nCtrl+Shift+N: 新しい付箋\nCtrl+Shift+H: 付箋の表示/非表示", ToolTipIcon.Info);
             }
             else
             {
@@ -523,9 +523,9 @@ namespace StickyNoteApp
             base.OnFormClosing(e);
 
             // ホットキーを解除
-            if (hotkeyManager != null)
+            if (HotkeyManager != null)
             {
-                hotkeyManager.UnregisterHotkeys();
+                HotkeyManager.UnregisterHotkeys();
                 System.Diagnostics.Debug.WriteLine("ホットキー解除完了");
             }
         }
