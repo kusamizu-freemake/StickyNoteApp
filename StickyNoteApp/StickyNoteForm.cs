@@ -453,7 +453,8 @@ namespace StickyNoteApp
         /// </summary>
         private void InitializeReminder()
         {
-            reminderManager = new ReminderManager();
+            // 自分自身（this）をReminderManagerに渡す
+            reminderManager = new ReminderManager(this);
 
             // リマインダー通知イベントの登録
             reminderManager.ReminderTriggered += (s, e) =>
@@ -462,13 +463,16 @@ namespace StickyNoteApp
                 this.Activate();
                 System.Diagnostics.Debug.WriteLine($"[{NoteId}] リマインダー通知表示");
             };
+        }
 
-            // リマインダー状態変更イベント（自動保存のため）
-            reminderManager.ReminderStateChanged += (s, e) =>
-            {
-                needsSave = true;
-                System.Diagnostics.Debug.WriteLine($"[{NoteId}] リマインダー状態変更");
-            };
+        /// <summary>
+        /// リマインダー状態が変更されたことを通知される（ReminderManagerから呼ばれる）
+        /// 呼ぶタイミング： リマインダーの有効/無効切り替え、時間変更時
+        /// </summary>
+        public void NotifyReminderStateChanged()
+        {
+            needsSave = true;
+            System.Diagnostics.Debug.WriteLine($"[{NoteId}] リマインダー状態変更 - 自動保存フラグセット");
         }
 
         // DBから読み込んだリマインダー情報を設定
@@ -559,7 +563,6 @@ namespace StickyNoteApp
 
             // txtNoteの前に追加（タイトルバーの下）
             this.Controls.Add(pictureBox);
-
             // pictureBox を txtNote より前（上）に移動
             this.Controls.SetChildIndex(pictureBox, 0);
         }
@@ -602,7 +605,6 @@ namespace StickyNoteApp
                         if (saveDialog.ShowDialog() == DialogResult.OK)
                         {
                             var format = System.Drawing.Imaging.ImageFormat.Png;
-
                             string ext = System.IO.Path.GetExtension(saveDialog.FileName).ToLower();
                             switch (ext)
                             {
@@ -637,13 +639,10 @@ namespace StickyNoteApp
             if (pictureBox.Visible)
             {
                 pictureBox.Height = height;
-
                 // テキストボックスの位置を調整
                 txtNote.Top = pictureBox.Bottom;
                 txtNote.Height = this.ClientSize.Height - txtNote.Top;
-
                 needsSave = true;
-
                 System.Diagnostics.Debug.WriteLine($"[{NoteId}] 画像サイズ変更: {height}px");
             }
         }
@@ -695,10 +694,8 @@ namespace StickyNoteApp
             }
 
             capturedImagePath = null;
-
             // テキストボックスの位置を調整
             txtNote.Dock = DockStyle.Fill;
-
             needsSave = true;
         }
 
@@ -810,7 +807,6 @@ namespace StickyNoteApp
             // 現在の付箋の近くに表示
             newNote.Location = new Point(this.Left + NEW_NOTE_OFFSET_X, this.Top + NEW_NOTE_OFFSET_Y);
             newNote.Show();
-
             System.Diagnostics.Debug.WriteLine($"右クリックから新しい付箋作成: ID={newNote.NoteId}");
         }
 
@@ -821,7 +817,6 @@ namespace StickyNoteApp
         {
             this.TopMost = topMostMenuItem.Checked;
             needsSave = true;
-
             System.Diagnostics.Debug.WriteLine($"[{NoteId}] 最前面表示: {this.TopMost}");
         }
 
@@ -856,19 +851,15 @@ namespace StickyNoteApp
         {
             // BackColorChangedイベントを一時的に解除
             this.BackColorChanged -= StickyNoteContentChanged;
-
             // テキストボックスの色のみを変更
             this.txtNote.BackColor = color;
             // データベース保存用にフォームのBackColorも更新
             this.BackColor = color;
             // タイトルバーの色を確実に固定（念のため再設定）
             this.titleBar.BackColor = Color.WhiteSmoke;
-
             // イベントを再登録
             this.BackColorChanged += StickyNoteContentChanged;
-
             needsSave = true;
-
             System.Diagnostics.Debug.WriteLine($"[{NoteId}] 色変更: {color.Name}");
         }
 
@@ -965,7 +956,6 @@ namespace StickyNoteApp
 
                         // Bitmapに変換
                         Bitmap bitmap = new Bitmap(clipboardImage);
-
                         // 画像を保存
                         string imagePath = SaveCapturedImage(bitmap);
 
@@ -1148,7 +1138,6 @@ namespace StickyNoteApp
             txtNote.Text = text;
             // イベントを再登録
             this.txtNote.TextChanged += StickyNoteContentChanged;
-
             System.Diagnostics.Debug.WriteLine($"[{NoteId}] テキスト設定: {text}");
         }
 

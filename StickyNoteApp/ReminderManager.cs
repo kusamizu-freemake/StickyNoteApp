@@ -36,8 +36,10 @@ namespace StickyNoteApp
         // インスタンス管理用（デバッグ確認用）
         private static int instanceCount = 0;
 
+        // 親フォーム（StickyNoteForm）への参照。親フォームを覚えておく
+        private StickyNoteForm parentForm;
+
         public event EventHandler ReminderTriggered; // リマインダー発火イベント
-        public event EventHandler ReminderStateChanged; // リマインダー状態変更イベント(編集要：変更しているタイミングで保存する処理を呼ぶで作る）
 
         /// <summary>
         /// リマインダーが設定されているか
@@ -50,12 +52,15 @@ namespace StickyNoteApp
         public DateTime ReminderTime => reminderTime;
 
         /// <summary>
-        /// コンストラクタ（インスタンス作成ログ）
+        /// コンストラクタ（親フォームを受け取る）
         /// </summary>
-        public ReminderManager()
+        public ReminderManager(StickyNoteForm parent)
         {
+            // 親フォームを保存
+            this.parentForm = parent;
+
             System.Diagnostics.Debug.WriteLine($"[ReminderManager] ctor Hash={this.GetHashCode()} Thread={Thread.CurrentThread.ManagedThreadId}");
-            Interlocked.Increment(ref instanceCount);
+            Interlocked.Increment(ref instanceCount); // インスタンス数をインクリメント
             System.Diagnostics.Debug.WriteLine($"[ReminderManager] instanceCount={instanceCount}");
         }
 
@@ -166,8 +171,9 @@ namespace StickyNoteApp
                 reminderTimer.Tick += ReminderTimer_Tick;
                 reminderTimer.Start();
 
-                // 状態変更イベントを発火（保存のため） →編集要：変更しているタイミングで保存する処理を呼ぶで作る
-                ReminderStateChanged?.Invoke(this, EventArgs.Empty);
+                // 親フォームに保存が必要であることを通知
+                // 状態変更時に直接呼ぶ
+                parentForm.NotifyReminderStateChanged();
 
                 System.Diagnostics.Debug.WriteLine($"[{noteId}] リマインダー設定: {minutes}分後 ({reminderTime:HH:mm:ss}) Thread={Thread.CurrentThread.ManagedThreadId}");
             }
@@ -197,8 +203,9 @@ namespace StickyNoteApp
 
                 isActive = false;
 
-                // 状態変更イベントを発火（保存のため） →編集要：変更しているタイミングで保存する処理を呼ぶで作る
-                ReminderStateChanged?.Invoke(this, EventArgs.Empty);
+                // 親フォームに保存が必要であることを通知
+                // 状態変更時に直接呼ぶ
+                parentForm.NotifyReminderStateChanged();
 
                 System.Diagnostics.Debug.WriteLine($"[{noteId}] リマインダーキャンセル Thread={Thread.CurrentThread.ManagedThreadId}");
             }
@@ -227,10 +234,12 @@ namespace StickyNoteApp
                     reminderTimer.Tick -= ReminderTimer_Tick; // イベント解除
                     isActive = false;
 
-                    // 先に状態変更イベント（保存） →編集要：変更しているタイミングで保存する処理を呼ぶで作る
-                    ReminderStateChanged?.Invoke(this, EventArgs.Empty);
+                    // 親フォームに保存が必要であることを通知
+                    // 状態変更時に直接呼ぶ
+                    parentForm.NotifyReminderStateChanged();
 
-                    // 付箋側で最前面化するハンドラを先に実行させるため、ReminderTriggered を先に発火
+                    // 保存完了後、付箋を最前面に表示してから通知ダイアログを出す
+                    // （順番：保存 → 付箋を前面に → 通知表示）
                     ReminderTriggered?.Invoke(this, EventArgs.Empty);
 
                     // 通知を表示
