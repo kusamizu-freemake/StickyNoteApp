@@ -11,16 +11,39 @@ namespace StickyNoteApp
     /// </summary>
     public partial class TrayManagerForm : Form
     {
-        private static NotifyIcon trayIcon; // タスクトレイアイコン
-        private ContextMenuStrip trayMenu; // トレイメニュー
-        private ToolStripMenuItem toggleAllNotesMenuItem; // すべての付箋表示/非表示メニュー
+        // 定数定義
+
+        // データベースに指定した列が存在しないときに使う値（まだ列番号が分かっていない状態）
+        // -1 のときは「その列は使えない」と判断するために利用する
+        private const int COLUMN_NOT_FOUND = -1; 
+
+        private const int CURSOR_OFFSET = 50; // カーソル位置からの付箋作成オフセット
+        private const int TOPMOST_FLAG_ENABLED = 1; // TopMostフラグが有効な場合の値
+        private const int REMINDER_FLAG_ENABLED = 1; // リマインダーフラグが有効な場合の値
+        private const int TRAY_BALLOON_TIP_DURATION = 2000; // トレイアイコンのバルーンチップ表示時間(ミリ秒)
+        private const int TRAY_BALLOON_TIP_DURATION_SHORT = 1000; // トレイアイコンのバルーンチップ表示時間(短)(ミリ秒)
+
+        // テストフォームのサイズ設定
+        private const int TEST_FORM_WIDTH = 600; // テストフォームの幅
+        private const int TEST_FORM_HEIGHT = 500; // テストフォームの高さ
+        private const int TEST_FORM_BUTTON_HEIGHT = 40; // テストフォームのボタン高さ
+        private const int TEST_FORM_LABEL_HEIGHT = 30; // テストフォームのラベル高さ
+
+        private static NotifyIcon TrayIcon; // タスクトレイアイコン
+        private ContextMenuStrip TrayMenu; // トレイメニュー
+        private ToolStripMenuItem ToggleAllNotesMenuItem; // すべての付箋表示/非表示メニュー
 
         // 全付箋を追跡するリスト
         private List<StickyNoteForm> allNotes = new List<StickyNoteForm>();
         private bool allNotesVisible = true;
 
         // ホットキーマネージャー
-        private HotkeyManager hotkeyManager;
+        private HotkeyManager HotkeyManager;
+
+        // データベースの「リマインダーが有効か」「リマインダー時刻」の列が何番目にあるかを記憶する変数
+        // まだ見つかっていない場合は -1 のまま（初期値）
+        private int reminderActiveOrdinal = COLUMN_NOT_FOUND; // リマインダー有効フラグ
+        private int reminderTimeOrdinal = COLUMN_NOT_FOUND; // リマインダー時刻
 
         // 常駐開始
         public TrayManagerForm()
@@ -36,9 +59,9 @@ namespace StickyNoteApp
             System.Diagnostics.Debug.WriteLine("TrayManagerForm: トレイアイコン初期化完了");
 
             // ホットキーマネージャーの初期化
-            hotkeyManager = new HotkeyManager();
-            hotkeyManager.NewNoteRequested += (s, e) => OnCreateNoteClicked(s, e);
-            hotkeyManager.ToggleNotesRequested += (s, e) => OnShowHideAllStickyNotesClicked(s, e);
+            HotkeyManager = new HotkeyManager();
+            HotkeyManager.NewNoteRequested += (s, e) => OnCreateNoteClicked(s, e);
+            HotkeyManager.ToggleNotesRequested += (s, e) => OnShowHideAllStickyNotesClicked(s, e);
 
             System.Diagnostics.Debug.WriteLine("TrayManagerForm: ホットキーマネージャー初期化完了");
 
@@ -53,43 +76,42 @@ namespace StickyNoteApp
         private void InitializeTray()
         {
             // 右クリック時に表示されるメニュー
-            trayMenu = new ContextMenuStrip();
+            TrayMenu = new ContextMenuStrip();
 
             // メニュー項目にショートカットキーを表示
-            var newNoteItem = new ToolStripMenuItem("新しい付箋を作成");
-            newNoteItem.ShortcutKeyDisplayString = "Ctrl+Shift+N";
-            newNoteItem.Click += OnCreateNoteClicked;
-            trayMenu.Items.Add(newNoteItem);
+            var NewNoteItem = new ToolStripMenuItem("新しい付箋を作成");
+            NewNoteItem.ShortcutKeyDisplayString = "Ctrl+Shift+N";
+            NewNoteItem.Click += OnCreateNoteClicked;
+            TrayMenu.Items.Add(NewNoteItem);
 
-            toggleAllNotesMenuItem = new ToolStripMenuItem("すべての付箋を非表示");
-            toggleAllNotesMenuItem.ShortcutKeyDisplayString = "Ctrl+Shift+H";
-            toggleAllNotesMenuItem.Click += OnShowHideAllStickyNotesClicked;
-            trayMenu.Items.Add(toggleAllNotesMenuItem);
-            
+            ToggleAllNotesMenuItem = new ToolStripMenuItem("すべての付箋を非表示");
+            ToggleAllNotesMenuItem.ShortcutKeyDisplayString = "Ctrl+Shift+H";
+            ToggleAllNotesMenuItem.Click += OnShowHideAllStickyNotesClicked;
+            TrayMenu.Items.Add(ToggleAllNotesMenuItem);
             // DB整合性チェック（デバッグ用。のちに削除予定）
-            trayMenu.Items.Add(new ToolStripSeparator()); // 区切り線
-            trayMenu.Items.Add("データベース整合性チェック", null, OnDatabaseIntegrityCheckClicked);
+            TrayMenu.Items.Add(new ToolStripSeparator()); // 区切り線
+            TrayMenu.Items.Add("データベース整合性チェック", null, OnDatabaseIntegrityCheckClicked);
 
             // 画面キャプチャテスト
             var captureTestItem = new ToolStripMenuItem("画面キャプチャテスト");
             captureTestItem.Click += OnCaptureTestClicked;
-            trayMenu.Items.Add(captureTestItem);
+            TrayMenu.Items.Add(captureTestItem);
 
             // 設定（未実装）
-            trayMenu.Items.Add("設定", null, OnSettingClicked);
-            trayMenu.Items.Add(new ToolStripSeparator()); // 区切り線
-            trayMenu.Items.Add("アプリを終了", null, OnExitClicked);
+            TrayMenu.Items.Add("設定", null, OnSettingClicked);
+            TrayMenu.Items.Add(new ToolStripSeparator()); // 区切り線
+            TrayMenu.Items.Add("アプリを終了", null, OnExitClicked);
 
             // タスクトレイアイコンの設定
-            trayIcon = new NotifyIcon
+            TrayIcon = new NotifyIcon
             {
                 Icon = SystemIcons.Information,
                 Visible = true,
-                ContextMenuStrip = trayMenu,
+                ContextMenuStrip = TrayMenu,
                 Text = "付箋アプリ\nCtrl+Shift+N: 新規付箋\nCtrl+Shift+H: 表示/非表示"
             };
 
-            trayIcon.MouseClick += TrayIcon_MouseClick;
+            TrayIcon.MouseClick += TrayIcon_MouseClick;
         }
 
         /// <summary>
@@ -99,7 +121,7 @@ namespace StickyNoteApp
         {
             if (e.Button == MouseButtons.Left)
             {
-                trayIcon.ShowBalloonTip(1000, "付箋アプリ", "タスクトレイで動作中", ToolTipIcon.Info);
+                TrayIcon.ShowBalloonTip(TRAY_BALLOON_TIP_DURATION_SHORT, "付箋アプリ", "タスクトレイで動作中", ToolTipIcon.Info);
             }
         }
 
@@ -108,8 +130,8 @@ namespace StickyNoteApp
         /// </summary>
         private void RestoreNotes()
         {
-            // 復元した付箋の数をカウント
-            int restoredCount = 0;
+            int restoredCount = 0; // 復元した付箋の数をカウント
+            int reminderRestoredCount = 0; // リマインダー復元数
 
             try
             {
@@ -152,7 +174,7 @@ namespace StickyNoteApp
                         );
 
                         // TopMostを復元
-                        bool topMost = Convert.ToInt32(reader["TopMostFlag"]) == 1;
+                        bool topMost = Convert.ToInt32(reader["TopMostFlag"]) == TOPMOST_FLAG_ENABLED;
                         note.SetTopMost(topMost);
 
                         // テキストを最後に復元
@@ -165,7 +187,70 @@ namespace StickyNoteApp
                             note.LoadCapturedImage(imagePath);
                         }
 
-                        // 付箋をリストに追加
+                        // ============================================
+                        // リマインダー復元処理
+                        // ============================================
+                        try
+                        {
+                            // ReminderActiveカラムが存在するかチェック
+                            if (reminderActiveOrdinal == COLUMN_NOT_FOUND)
+                            {
+                                try
+                                {
+                                    reminderActiveOrdinal = reader.GetOrdinal("ReminderActive"); // カラム名から列番号を取得(ReminderActive:リマインダー有効フラグ)
+                                    reminderTimeOrdinal = reader.GetOrdinal("ReminderTime"); // カラム名から列番号を取得(ReminderTime:リマインダー時刻)
+                                }
+                                catch
+                                {
+                                    // カラムが存在しない場合は何もしない（初回起動時など）
+                                    System.Diagnostics.Debug.WriteLine($"[{id}] リマインダーカラムが存在しません（初回起動）");
+                                }
+                            }
+
+                            if (reminderActiveOrdinal != COLUMN_NOT_FOUND && reminderTimeOrdinal != COLUMN_NOT_FOUND)
+                            {
+                                bool reminderActive = !reader.IsDBNull(reminderActiveOrdinal) &&
+                                                     Convert.ToInt32(reader["ReminderActive"]) == REMINDER_FLAG_ENABLED;
+
+                                if (reminderActive)
+                                {
+                                    string reminderTimeStr = reader["ReminderTime"]?.ToString(); // リマインダー時刻文字列取得
+
+                                    if (!string.IsNullOrEmpty(reminderTimeStr))
+                                    {
+                                        DateTime reminderTime = DateTime.Parse(reminderTimeStr); // リマインダー時刻を解析
+
+                                        // 未来の時刻のみ復元
+                                        if (reminderTime > DateTime.Now)
+                                        {
+                                            note.RestoreReminder(reminderTime);
+                                            reminderRestoredCount++;
+
+                                            TimeSpan timeLeft = reminderTime - DateTime.Now; // 残り時間計算
+                                            System.Diagnostics.Debug.WriteLine(
+                                                $"  → リマインダー復元: {reminderTime:yyyy-MM-dd HH:mm:ss} " +
+                                                $"(残り {timeLeft.TotalMinutes:F1}分)"
+                                            );
+                                        }
+                                        else
+                                        {
+                                            System.Diagnostics.Debug.WriteLine(
+                                                $"  → リマインダー時刻が過去のため無効化: {reminderTime:yyyy-MM-dd HH:mm:ss}"
+                                            );
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        catch (Exception reminderEx)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[{id}] リマインダー復元エラー: {reminderEx.Message}");
+                            // リマインダーの復元に失敗しても、付箋自体は表示する
+                        }
+                        // ============================================
+                        // リマインダー復元処理ここまで
+                        // ============================================
+
                         allNotes.Add(note);
 
                         // 付箋が閉じられたらリストから削除
@@ -180,7 +265,7 @@ namespace StickyNoteApp
                     }
                 }
 
-                System.Diagnostics.Debug.WriteLine($"=== 付箋復元完了: {restoredCount}件 ===");
+                System.Diagnostics.Debug.WriteLine($"=== 付箋復元完了: {restoredCount}件（リマインダー復元: {reminderRestoredCount}件） ===");
             }
             catch (Exception ex)
             {
@@ -195,7 +280,10 @@ namespace StickyNoteApp
         private void OnCreateNoteClicked(object sender, EventArgs e)
         {
             StickyNoteForm note = new StickyNoteForm();
-            note.Location = new Point(Cursor.Position.X - 50, Cursor.Position.Y - 50);
+            note.Location = new Point(
+                Cursor.Position.X - CURSOR_OFFSET,
+                Cursor.Position.Y - CURSOR_OFFSET
+            ); // カーソル位置に表示
 
             // 付箋をリストに追加
             allNotes.Add(note);
@@ -228,7 +316,7 @@ namespace StickyNoteApp
                     note.Hide();
                 }
                 allNotesVisible = false;
-                toggleAllNotesMenuItem.Text = "すべての付箋を表示";
+                ToggleAllNotesMenuItem.Text = "すべての付箋を表示";
                 System.Diagnostics.Debug.WriteLine($"すべての付箋を非表示にしました ({allNotes.Count}件)");
             }
             else
@@ -239,7 +327,7 @@ namespace StickyNoteApp
                     note.Show();
                 }
                 allNotesVisible = true;
-                toggleAllNotesMenuItem.Text = "すべての付箋を非表示";
+                ToggleAllNotesMenuItem.Text = "すべての付箋を非表示";
                 System.Diagnostics.Debug.WriteLine($"すべての付箋を表示しました ({allNotes.Count}件)");
             }
         }
@@ -260,7 +348,6 @@ namespace StickyNoteApp
                 overlay.CaptureCompleted += (s, args) =>
                 {
                     System.Diagnostics.Debug.WriteLine($"キャプチャ完了: {args.CapturedImage.Width}x{args.CapturedImage.Height}");
-
                     // テスト用：キャプチャした画像を表示
                     ShowCapturedImageTest(args.CapturedImage);
                 };
@@ -284,7 +371,7 @@ namespace StickyNoteApp
             // テスト用フォームを作成
             var testForm = new Form();
             testForm.Text = "キャプチャテスト結果";
-            testForm.Size = new Size(600, 500);
+            testForm.Size = new Size(TEST_FORM_WIDTH, TEST_FORM_HEIGHT);
             testForm.StartPosition = FormStartPosition.CenterScreen;
 
             var pictureBox = new PictureBox();
@@ -295,7 +382,7 @@ namespace StickyNoteApp
             var saveButton = new Button();
             saveButton.Text = "画像を保存";
             saveButton.Dock = DockStyle.Bottom;
-            saveButton.Height = 40;
+            saveButton.Height = TEST_FORM_BUTTON_HEIGHT;
             saveButton.Click += (s, e) =>
             {
                 SaveCapturedImageTest(image);
@@ -304,7 +391,7 @@ namespace StickyNoteApp
             var infoLabel = new Label();
             infoLabel.Text = $"サイズ: {image.Width} × {image.Height}";
             infoLabel.Dock = DockStyle.Top;
-            infoLabel.Height = 30;
+            infoLabel.Height = TEST_FORM_LABEL_HEIGHT;
             infoLabel.TextAlign = ContentAlignment.MiddleCenter;
             infoLabel.BackColor = Color.LightGray;
 
@@ -411,7 +498,7 @@ namespace StickyNoteApp
         private void OnExitClicked(object sender, EventArgs e)
         {
             System.Diagnostics.Debug.WriteLine("アプリケーション終了");
-            trayIcon.Visible = false;
+            TrayIcon.Visible = false;
             Application.Exit();
         }
 
@@ -424,10 +511,10 @@ namespace StickyNoteApp
             System.Diagnostics.Debug.WriteLine("OnShown: フォームを非表示にします");
 
             // ホットキーを登録
-            if (hotkeyManager.RegisterHotkeys(this.Handle))
+            if (HotkeyManager.RegisterHotkeys(this.Handle))
             {
                 System.Diagnostics.Debug.WriteLine("ホットキー登録成功");
-                trayIcon.ShowBalloonTip(2000, "付箋アプリ", "ショートカットキー:\nCtrl+Shift+N: 新しい付箋\nCtrl+Shift+H: 付箋の表示/非表示", ToolTipIcon.Info);
+                TrayIcon.ShowBalloonTip(TRAY_BALLOON_TIP_DURATION, "付箋アプリ", "ショートカットキー:\nCtrl+Shift+N: 新しい付箋\nCtrl+Shift+H: 付箋の表示/非表示", ToolTipIcon.Info);
             }
             else
             {
@@ -455,16 +542,15 @@ namespace StickyNoteApp
 
         /// <summary>
         /// フォームクローズ時の処理
-        /// 
         /// </summary>
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
             base.OnFormClosing(e);
 
             // ホットキーを解除
-            if (hotkeyManager != null)
+            if (HotkeyManager != null)
             {
-                hotkeyManager.UnregisterHotkeys();
+                HotkeyManager.UnregisterHotkeys();
                 System.Diagnostics.Debug.WriteLine("ホットキー解除完了");
             }
         }

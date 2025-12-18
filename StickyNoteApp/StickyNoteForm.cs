@@ -9,6 +9,38 @@ namespace StickyNoteApp
     /// </summary>
     public partial class StickyNoteForm : Form
     {
+        // 定数定義
+
+        // リサイズ関連
+        private const int RESIZE_BORDER_WIDTH = 8; // リサイズ可能な枠の幅
+        private const int MIN_WIDTH = 150; // 最小幅
+        private const int MIN_HEIGHT = 100; // 最小高さ
+
+        // タイマー関連
+        private const int AUTO_SAVE_INTERVAL_MS = 1000; // 自動保存間隔（ミリ秒）
+
+        // 新規付箋作成時のオフセット
+        private const int NEW_NOTE_OFFSET_X = 30; // 新規付箋のX方向オフセット
+        private const int NEW_NOTE_OFFSET_Y = 30; // 新規付箋のY方向オフセット
+
+        // 画像表示関連
+        private const int DEFAULT_IMAGE_HEIGHT = 150; // デフォルト画像表示高さ
+        private const int IMAGE_LEFT_MARGIN = 0; // 画像の左マージン
+        private const int IMAGE_SIZE_SMALL = 100; // 画像サイズ：小
+        private const int IMAGE_SIZE_MEDIUM = 150; // 画像サイズ：中
+        private const int IMAGE_SIZE_LARGE = 200; // 画像サイズ：大
+        private const int IMAGE_SIZE_EXTRA_LARGE = 250; // 画像サイズ：特大
+
+        // テキストプレビュー関連
+        private const int PREVIEW_TEXT_MAX_LENGTH = 20; // プレビューテキストの最大文字数
+
+        // リマインダー時間（分）
+        private const int REMINDER_TIME_10MIN = 10; // 10分
+        private const int REMINDER_TIME_30MIN = 30; // 30分
+        private const int REMINDER_TIME_60MIN = 60; // 60分
+
+
+        // ドラッグ移動用の変数
         private bool dragging = false;
         private Point dragStart;
         private Timer autoSaveTimer;
@@ -20,9 +52,6 @@ namespace StickyNoteApp
         private Size resizeStartSize;
         private Point resizeStartLocation;
         private ResizeDirection resizeDirection = ResizeDirection.None;
-        private const int RESIZE_BORDER_WIDTH = 8; // リサイズ可能な枠の幅
-        private const int MIN_WIDTH = 150; // 最小幅
-        private const int MIN_HEIGHT = 100; // 最小高さ
 
         // サイズ変更の方向
         private enum ResizeDirection
@@ -64,13 +93,12 @@ namespace StickyNoteApp
             InitializeReminder();             // リマインダー管理の初期化
             InitializePictureBox();           // 画面キャプチャ用のPictureBox初期化
 
-
             // 最前面表示の初期状態を反映
             UpdateTopMostMenuState();
 
-
             System.Diagnostics.Debug.WriteLine($"付箋作成: ID={NoteId}");
         }
+
         /// <summary>
         /// 付箋内容変更検知用のイベントハンドラーの初期化
         /// </summary>
@@ -82,7 +110,6 @@ namespace StickyNoteApp
             this.SizeChanged += OnSizeChanged;
             this.BackColorChanged += StickyNoteContentChanged;
         }
-
 
         /// <summary>
         /// サイズ変更ハンドラーの初期化（リサイズ機能）
@@ -99,7 +126,6 @@ namespace StickyNoteApp
             this.txtNote.MouseMove += TxtNote_MouseMove;
             this.txtNote.MouseDown += TxtNote_MouseDown;
             this.txtNote.MouseUp += TxtNote_MouseUp;
-
         }
 
         /// <summary>
@@ -140,7 +166,7 @@ namespace StickyNoteApp
             {
                 Point formPoint = this.txtNote.PointToScreen(e.Location);
                 formPoint = this.PointToClient(formPoint);
-                
+
                 resizeDirection = GetResizeDirection(formPoint);
 
                 // 枠の近くでのみサイズ変更を開始
@@ -417,10 +443,9 @@ namespace StickyNoteApp
         {
             // タイマー設定
             autoSaveTimer = new Timer();
-            autoSaveTimer.Interval = 1000; // 1秒ごと
+            autoSaveTimer.Interval = AUTO_SAVE_INTERVAL_MS;
             autoSaveTimer.Tick += AutoSaveTimer_Tick;
             autoSaveTimer.Start();
-
         }
 
         /// <summary>
@@ -429,12 +454,46 @@ namespace StickyNoteApp
         private void InitializeReminder()
         {
             reminderManager = new ReminderManager();
+
+            // リマインダー通知イベントの登録
             reminderManager.ReminderTriggered += (s, e) =>
             {
                 this.TopMost = true;
                 this.Activate();
                 System.Diagnostics.Debug.WriteLine($"[{NoteId}] リマインダー通知表示");
             };
+
+            // リマインダー状態変更イベント（自動保存のため）
+            reminderManager.ReminderStateChanged += (s, e) =>
+            {
+                needsSave = true;
+                System.Diagnostics.Debug.WriteLine($"[{NoteId}] リマインダー状態変更");
+            };
+        }
+
+        // DBから読み込んだリマインダー情報を設定
+        /// <summary>
+        /// リマインダー情報を取得（データベース保存用）
+        /// </summary>
+        public ReminderInfo GetReminderInfo()
+        {
+            if (reminderManager != null)
+            {
+                return reminderManager.GetReminderInfo();
+            }
+            return new ReminderInfo { IsActive = false };
+        }
+
+        /// <summary>
+        /// リマインダーを復元（データベースからの読み込み時用）
+        /// </summary>
+        public void RestoreReminder(DateTime reminderTime)
+        {
+            if (reminderManager != null && reminderTime > DateTime.Now)
+            {
+                reminderManager.RestoreReminder(NoteId, txtNote.Text, reminderTime);
+                System.Diagnostics.Debug.WriteLine($"[{NoteId}] リマインダー復元完了: {reminderTime:yyyy-MM-dd HH:mm:ss}");
+            }
         }
 
         /// <summary>
@@ -479,19 +538,19 @@ namespace StickyNoteApp
             var resizeImageItem = new ToolStripMenuItem("画像サイズ");
 
             var sizeSmallItem = new ToolStripMenuItem("小 (100px)");
-            sizeSmallItem.Click += (s, e) => ResizeImage(100);
+            sizeSmallItem.Click += (s, e) => ResizeImage(IMAGE_SIZE_SMALL);
             resizeImageItem.DropDownItems.Add(sizeSmallItem);
 
             var sizeMediumItem = new ToolStripMenuItem("中 (150px)");
-            sizeMediumItem.Click += (s, e) => ResizeImage(150);
+            sizeMediumItem.Click += (s, e) => ResizeImage(IMAGE_SIZE_MEDIUM);
             resizeImageItem.DropDownItems.Add(sizeMediumItem);
 
             var sizeLargeItem = new ToolStripMenuItem("大 (200px)");
-            sizeLargeItem.Click += (s, e) => ResizeImage(200);
+            sizeLargeItem.Click += (s, e) => ResizeImage(IMAGE_SIZE_LARGE);
             resizeImageItem.DropDownItems.Add(sizeLargeItem);
 
             var sizeExtraLargeItem = new ToolStripMenuItem("特大 (250px)");
-            sizeExtraLargeItem.Click += (s, e) => ResizeImage(250);
+            sizeExtraLargeItem.Click += (s, e) => ResizeImage(IMAGE_SIZE_EXTRA_LARGE);
             resizeImageItem.DropDownItems.Add(sizeExtraLargeItem);
 
             imageContextMenu.Items.Add(resizeImageItem);
@@ -749,7 +808,7 @@ namespace StickyNoteApp
         {
             StickyNoteForm newNote = new StickyNoteForm();
             // 現在の付箋の近くに表示
-            newNote.Location = new Point(this.Left + 30, this.Top + 30);
+            newNote.Location = new Point(this.Left + NEW_NOTE_OFFSET_X, this.Top + NEW_NOTE_OFFSET_Y);
             newNote.Show();
 
             System.Diagnostics.Debug.WriteLine($"右クリックから新しい付箋作成: ID={newNote.NoteId}");
@@ -912,13 +971,13 @@ namespace StickyNoteApp
 
                         // PictureBoxに表示
                         pictureBox.Image = bitmap;
-                        pictureBox.Height = 150;
+                        pictureBox.Height = DEFAULT_IMAGE_HEIGHT;
                         pictureBox.Visible = true;
 
                         // テキストボックスの位置を調整
                         txtNote.Dock = DockStyle.None;
                         txtNote.Top = pictureBox.Bottom;
-                        txtNote.Left = 0;
+                        txtNote.Left = IMAGE_LEFT_MARGIN;
                         txtNote.Width = this.ClientSize.Width;
                         txtNote.Height = this.ClientSize.Height - txtNote.Top;
 
@@ -959,13 +1018,13 @@ namespace StickyNoteApp
                 }
 
                 pictureBox.Image = e.CapturedImage;
-                pictureBox.Height = 150;
+                pictureBox.Height = DEFAULT_IMAGE_HEIGHT;
                 pictureBox.Visible = true;
 
                 // テキストボックスのDockを解除して位置を調整
                 txtNote.Dock = DockStyle.None;
                 txtNote.Top = pictureBox.Bottom;
-                txtNote.Left = 0;
+                txtNote.Left = IMAGE_LEFT_MARGIN;
                 txtNote.Width = this.ClientSize.Width;
                 txtNote.Height = this.ClientSize.Height - txtNote.Top;
 
@@ -1018,13 +1077,13 @@ namespace StickyNoteApp
                 if (!string.IsNullOrEmpty(imagePath) && System.IO.File.Exists(imagePath))
                 {
                     pictureBox.Image = Image.FromFile(imagePath);
-                    pictureBox.Height = 150;
+                    pictureBox.Height = DEFAULT_IMAGE_HEIGHT;
                     pictureBox.Visible = true;
 
                     // テキストボックスの位置を調整
                     txtNote.Dock = DockStyle.None;
                     txtNote.Top = pictureBox.Bottom;
-                    txtNote.Left = 0;
+                    txtNote.Left = IMAGE_LEFT_MARGIN;
                     txtNote.Width = this.ClientSize.Width;
                     txtNote.Height = this.ClientSize.Height - txtNote.Top;
 
@@ -1040,141 +1099,43 @@ namespace StickyNoteApp
         }
 
         /// <summary>
-        /// リマインダーメニュー：カスタム時間指定 RemainderManeger.Desinger.csに処理を移動予定
+        /// リマインダーメニュー:カスタム時間指定
         /// </summary>
         private void reminderCustomMenuItem_Click(object sender, EventArgs e)
         {
-            // カスタム時間入力ダイアログを表示
-            using (var inputForm = new Form())
-            {
-                inputForm.Text = "リマインダー時間設定";
-                inputForm.Width = 300;
-                inputForm.Height = 150;
-                inputForm.FormBorderStyle = FormBorderStyle.FixedDialog;
-                inputForm.StartPosition = FormStartPosition.CenterParent;
-                inputForm.MaximizeBox = false;
-                inputForm.MinimizeBox = false;
-
-                var label = new Label()
-                {
-                    Text = "通知までの時間を入力してください（1〜60分）:",
-                    Left = 20,
-                    Top = 20,
-                    Width = 250
-                };
-
-                var numericUpDown = new NumericUpDown()
-                {
-                    Left = 20,
-                    Top = 50,
-                    Width = 100,
-                    Minimum = 1,
-                    Maximum = 60,
-                    Value = 5
-                };
-
-                var labelMin = new Label()
-                {
-                    Text = "分後",
-                    Left = 125,
-                    Top = 53,
-                    Width = 40
-                };
-
-                var okButton = new Button()
-                {
-                    Text = "設定",
-                    Left = 100,
-                    Top = 80,
-                    Width = 80,
-                    DialogResult = DialogResult.OK
-                };
-
-                var cancelButton = new Button()
-                {
-                    Text = "キャンセル",
-                    Left = 190,
-                    Top = 80,
-                    Width = 80,
-                    DialogResult = DialogResult.Cancel
-                };
-
-                inputForm.Controls.Add(label);
-                inputForm.Controls.Add(numericUpDown);
-                inputForm.Controls.Add(labelMin);
-                inputForm.Controls.Add(okButton);
-                inputForm.Controls.Add(cancelButton);
-                inputForm.AcceptButton = okButton;
-                inputForm.CancelButton = cancelButton;
-
-                if (inputForm.ShowDialog() == DialogResult.OK)
-                {
-                    int minutes = (int)numericUpDown.Value;
-                    SetReminder(minutes);
-                }
-            }
+            reminderManager?.ShowCustomReminderDialog(NoteId, txtNote.Text);
         }
 
         /// <summary>
-        /// リマインダーメニュー：10分後
+        /// リマインダーメニュー:10分後
         /// </summary>
         private void reminder10MinMenuItem_Click(object sender, EventArgs e)
         {
-            SetReminder(10);
+            reminderManager?.SetReminderWithConfirmation(NoteId, txtNote.Text, REMINDER_TIME_10MIN);
         }
 
         /// <summary>
-        /// リマインダーメニュー：30分後
+        /// リマインダーメニュー:30分後
         /// </summary>
         private void reminder30MinMenuItem_Click(object sender, EventArgs e)
         {
-            SetReminder(30);
+            reminderManager?.SetReminderWithConfirmation(NoteId, txtNote.Text, REMINDER_TIME_30MIN);
         }
 
         /// <summary>
-        /// リマインダーメニュー：60分後
+        /// リマインダーメニュー:60分後
         /// </summary>
         private void reminder60MinMenuItem_Click(object sender, EventArgs e)
         {
-            SetReminder(60);
+            reminderManager?.SetReminderWithConfirmation(NoteId, txtNote.Text, REMINDER_TIME_60MIN);
         }
 
         /// <summary>
-        /// リマインダーメニュー：キャンセル
+        /// リマインダーメニュー:キャンセル
         /// </summary>
         private void reminderCancelMenuItem_Click(object sender, EventArgs e)
         {
-            if (reminderManager != null && reminderManager.IsActive)
-            {
-                reminderManager.CancelReminder();
-                MessageBox.Show("リマインダーをキャンセルしました。", "リマインダー", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            }
-            else
-            {
-                MessageBox.Show("設定されているリマインダーはありません。", "リマインダー", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            }
-        }
-
-        /// <summary>
-        /// リマインダーを設定
-        /// </summary>
-        private void SetReminder(int minutes)
-        {
-            if (reminderManager == null)
-            {
-                MessageBox.Show("リマインダーマネージャーが初期化されていません。", "エラー", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
-            }
-
-            reminderManager.SetReminder(NoteId, txtNote.Text, minutes);
-
-            DateTime reminderTime = DateTime.Now.AddMinutes(minutes);
-            MessageBox.Show(
-                $"{minutes}分後にリマインダーを通知します。\n\n通知時刻: {reminderTime:HH:mm:ss}",
-                "リマインダー設定",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Information
-            );
+            reminderManager?.ShowCancelReminderDialog();
         }
 
         /// <summary>
@@ -1210,7 +1171,9 @@ namespace StickyNoteApp
                 Database.SaveOrUpdate(this);
 
                 string preview = string.IsNullOrEmpty(txtNote.Text) ? "(空)" :
-                    (txtNote.Text.Length > 20 ? txtNote.Text.Substring(0, 20) + "..." : txtNote.Text);
+                    (txtNote.Text.Length > PREVIEW_TEXT_MAX_LENGTH ?
+                     txtNote.Text.Substring(0, PREVIEW_TEXT_MAX_LENGTH) + "..." :
+                     txtNote.Text);
 
                 System.Diagnostics.Debug.WriteLine($"✓ 保存成功 [{NoteId}]: '{preview}' at ({Left},{Top}) size ({Width}x{Height})");
             }
