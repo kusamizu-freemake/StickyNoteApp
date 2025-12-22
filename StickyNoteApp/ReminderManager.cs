@@ -173,7 +173,7 @@ namespace StickyNoteApp
 
                 // 親フォームに保存が必要であることを通知
                 // 状態変更時に直接呼ぶ
-                parentForm.NotifyReminderStateChanged();
+                parentForm.StickyNoteContentChanged(this, EventArgs.Empty);
 
                 System.Diagnostics.Debug.WriteLine($"[{noteId}] リマインダー設定: {minutes}分後 ({reminderTime:HH:mm:ss}) Thread={Thread.CurrentThread.ManagedThreadId}");
             }
@@ -205,7 +205,7 @@ namespace StickyNoteApp
 
                 // 親フォームに保存が必要であることを通知
                 // 状態変更時に直接呼ぶ
-                parentForm.NotifyReminderStateChanged();
+                parentForm.StickyNoteContentChanged(this, EventArgs.Empty);
 
                 System.Diagnostics.Debug.WriteLine($"[{noteId}] リマインダーキャンセル Thread={Thread.CurrentThread.ManagedThreadId}");
             }
@@ -236,7 +236,7 @@ namespace StickyNoteApp
 
                     // 親フォームに保存が必要であることを通知
                     // 状態変更時に直接呼ぶ
-                    parentForm.NotifyReminderStateChanged();
+                    parentForm.StickyNoteContentChanged(this, EventArgs.Empty);
 
                     // 保存完了後、付箋を最前面に表示してから通知ダイアログを出す
                     // （順番：保存 → 付箋を前面に → 通知表示）
@@ -244,6 +244,7 @@ namespace StickyNoteApp
 
                     // 通知を表示
                     ShowNotification();
+
                 }
             }
             catch (Exception ex)

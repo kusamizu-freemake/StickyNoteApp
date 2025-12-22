@@ -464,16 +464,7 @@ namespace StickyNoteApp
                 System.Diagnostics.Debug.WriteLine($"[{NoteId}] リマインダー通知表示");
             };
         }
-
-        /// <summary>
-        /// リマインダー状態が変更されたことを通知される（ReminderManagerから呼ばれる）
-        /// 呼ぶタイミング： リマインダーの有効/無効切り替え、時間変更時
-        /// </summary>
-        public void NotifyReminderStateChanged()
-        {
-            needsSave = true;
-            System.Diagnostics.Debug.WriteLine($"[{NoteId}] リマインダー状態変更 - 自動保存フラグセット");
-        }
+        
 
         // DBから読み込んだリマインダー情報を設定
         /// <summary>
@@ -730,7 +721,7 @@ namespace StickyNoteApp
         /// <summary>
         /// 内容変更時の処理(付箋の表示内容や状態が変更された時)
         /// </summary>
-        private void StickyNoteContentChanged(object sender, EventArgs e)
+        public void StickyNoteContentChanged(object sender, EventArgs e) // publicへ変更
         {
             needsSave = true;
             System.Diagnostics.Debug.WriteLine($"[{NoteId}] 変更検出");
