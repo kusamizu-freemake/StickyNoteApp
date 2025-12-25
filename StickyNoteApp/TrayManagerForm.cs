@@ -13,13 +13,8 @@ namespace StickyNoteApp
     {
         // 定数定義
 
-        // データベースに指定した列が存在しないときに使う値（まだ列番号が分かっていない状態）
-        // -1 のときは「その列は使えない」と判断するために利用する
-        private const int COLUMN_NOT_FOUND = -1; 
-
         private const int CURSOR_OFFSET = 50; // カーソル位置からの付箋作成オフセット
         private const int TOPMOST_FLAG_ENABLED = 1; // TopMostフラグが有効な場合の値
-        private const int REMINDER_FLAG_ENABLED = 1; // リマインダーフラグが有効な場合の値
         private const int TRAY_BALLOON_TIP_DURATION = 2000; // トレイアイコンのバルーンチップ表示時間(ミリ秒)
         private const int TRAY_BALLOON_TIP_DURATION_SHORT = 1000; // トレイアイコンのバルーンチップ表示時間(短)(ミリ秒)
 
@@ -40,10 +35,6 @@ namespace StickyNoteApp
         // ホットキーマネージャー
         private HotkeyManager HotkeyManager;
 
-        // データベースの「リマインダーが有効か」「リマインダー時刻」の列が何番目にあるかを記憶する変数
-        // まだ見つかっていない場合は -1 のまま（初期値）
-        private int reminderActiveOrdinal = COLUMN_NOT_FOUND; // リマインダー有効フラグ
-        private int reminderTimeOrdinal = COLUMN_NOT_FOUND; // リマインダー時刻
 
         // 常駐開始
         public TrayManagerForm()
@@ -153,103 +144,60 @@ namespace StickyNoteApp
                         // 付箋フォームを作成
                         StickyNoteForm note = new StickyNoteForm();
 
-                        // データベースから値を復元（順序を変更）
-                        note.NoteId = id;
-                        note.CreatedAt = reader["CreatedAt"].ToString();
+                        // 復元開始を通知（これでDB保存をスキップする）
+                        note.BeginRestore();
 
-                        // 色を先に復元
-                        Color bgColor = Color.FromArgb(
-                            Convert.ToInt32(reader["BgR"]),
-                            Convert.ToInt32(reader["BgG"]),
-                            Convert.ToInt32(reader["BgB"])
-                        );
-                        note.BackColor = bgColor;
-                        note.txtNote.BackColor = bgColor;
-
-                        // 位置とサイズを復元
-                        note.Location = new Point(posX, posY);
-                        note.Size = new Size(
-                            Convert.ToInt32(reader["Width"]),
-                            Convert.ToInt32(reader["Height"])
-                        );
-
-                        // TopMostを復元
-                        bool topMost = Convert.ToInt32(reader["TopMostFlag"]) == TOPMOST_FLAG_ENABLED;
-                        note.SetTopMost(topMost);
-
-                        // テキストを最後に復元
-                        note.SetText(content);
-
-                        // 画像を復元
-                        string imagePath = reader["ImagePath"]?.ToString();
-                        if (!string.IsNullOrEmpty(imagePath))
-                        {
-                            note.LoadCapturedImage(imagePath);
-                        }
-
-                        // ============================================
-                        // リマインダー復元処理
-                        // ============================================
                         try
                         {
-                            // ReminderActiveカラムが存在するかチェック
-                            if (reminderActiveOrdinal == COLUMN_NOT_FOUND)
+                            // データベースから値を復元
+                            note.NoteId = id;
+                            note.CreatedAt = reader["CreatedAt"].ToString();
+
+                            // 色を先に復元
+                            Color bgColor = Color.FromArgb(
+                                Convert.ToInt32(reader["BgR"]),
+                                Convert.ToInt32(reader["BgG"]),
+                                Convert.ToInt32(reader["BgB"])
+                            );
+                            note.BackColor = bgColor;
+                            note.txtNote.BackColor = bgColor;
+
+                            // 位置とサイズを復元
+                            note.Location = new Point(posX, posY);
+                            note.Size = new Size(
+                                Convert.ToInt32(reader["Width"]),
+                                Convert.ToInt32(reader["Height"])
+                            );
+
+                            // TopMostを復元
+                            bool topMost = Convert.ToInt32(reader["TopMostFlag"]) == TOPMOST_FLAG_ENABLED;
+                            note.SetTopMost(topMost);
+
+                            // テキストを最後に復元
+                            note.SetText(content);
+
+                            // 画像を復元
+                            string imagePath = reader["ImagePath"]?.ToString();
+                            if (!string.IsNullOrEmpty(imagePath))
                             {
-                                try
-                                {
-                                    reminderActiveOrdinal = reader.GetOrdinal("ReminderActive"); // カラム名から列番号を取得(ReminderActive:リマインダー有効フラグ)
-                                    reminderTimeOrdinal = reader.GetOrdinal("ReminderTime"); // カラム名から列番号を取得(ReminderTime:リマインダー時刻)
-                                }
-                                catch
-                                {
-                                    // カラムが存在しない場合は何もしない（初回起動時など）
-                                    System.Diagnostics.Debug.WriteLine($"[{id}] リマインダーカラムが存在しません（初回起動）");
-                                }
+                                note.LoadCapturedImage(imagePath);
                             }
 
-                            if (reminderActiveOrdinal != COLUMN_NOT_FOUND && reminderTimeOrdinal != COLUMN_NOT_FOUND)
+                            // リマインダー復元（ReminderManagerに委譲）
+                            if (note.GetReminderInfo() != null)
                             {
-                                bool reminderActive = !reader.IsDBNull(reminderActiveOrdinal) &&
-                                                     Convert.ToInt32(reader["ReminderActive"]) == REMINDER_FLAG_ENABLED;
-
-                                if (reminderActive)
+                                var reminderManager = note.GetReminderManager();
+                                if (reminderManager != null && reminderManager.RestoreReminderFromDatabase(id, content, reader))
                                 {
-                                    string reminderTimeStr = reader["ReminderTime"]?.ToString(); // リマインダー時刻文字列取得
-
-                                    if (!string.IsNullOrEmpty(reminderTimeStr))
-                                    {
-                                        DateTime reminderTime = DateTime.Parse(reminderTimeStr); // リマインダー時刻を解析
-
-                                        // 未来の時刻のみ復元
-                                        if (reminderTime > DateTime.Now)
-                                        {
-                                            note.RestoreReminder(reminderTime);
-                                            reminderRestoredCount++;
-
-                                            TimeSpan timeLeft = reminderTime - DateTime.Now; // 残り時間計算
-                                            System.Diagnostics.Debug.WriteLine(
-                                                $"  → リマインダー復元: {reminderTime:yyyy-MM-dd HH:mm:ss} " +
-                                                $"(残り {timeLeft.TotalMinutes:F1}分)"
-                                            );
-                                        }
-                                        else
-                                        {
-                                            System.Diagnostics.Debug.WriteLine(
-                                                $"  → リマインダー時刻が過去のため無効化: {reminderTime:yyyy-MM-dd HH:mm:ss}"
-                                            );
-                                        }
-                                    }
+                                    reminderRestoredCount++;
                                 }
                             }
                         }
-                        catch (Exception reminderEx)
+                        finally
                         {
-                            System.Diagnostics.Debug.WriteLine($"[{id}] リマインダー復元エラー: {reminderEx.Message}");
-                            // リマインダーの復元に失敗しても、付箋自体は表示する
+                            // 復元終了を通知（各付箋ごとに実行）
+                            note.EndRestore();
                         }
-                        // ============================================
-                        // リマインダー復元処理ここまで
-                        // ============================================
 
                         allNotes.Add(note);
 
@@ -273,6 +221,8 @@ namespace StickyNoteApp
                 MessageBox.Show($"付箋の復元中にエラー:\n{ex.Message}", "エラー");
             }
         }
+
+
 
         /// <summary>
         /// 新しい付箋を作成

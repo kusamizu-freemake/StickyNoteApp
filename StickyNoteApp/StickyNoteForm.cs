@@ -16,9 +16,6 @@ namespace StickyNoteApp
         private const int MIN_WIDTH = 150; // 最小幅
         private const int MIN_HEIGHT = 100; // 最小高さ
 
-        // タイマー関連
-        private const int AUTO_SAVE_INTERVAL_MS = 1000; // 自動保存間隔（ミリ秒）
-
         // 新規付箋作成時のオフセット
         private const int NEW_NOTE_OFFSET_X = 30; // 新規付箋のX方向オフセット
         private const int NEW_NOTE_OFFSET_Y = 30; // 新規付箋のY方向オフセット
@@ -38,13 +35,18 @@ namespace StickyNoteApp
         private const int REMINDER_TIME_10MIN = 10; // 10分
         private const int REMINDER_TIME_30MIN = 30; // 30分
         private const int REMINDER_TIME_60MIN = 60; // 60分
+        private const int TEXT_SAVE_DELAY_MS = 5000; // テキスト保存までの遅延時間（ミリ秒）→5秒
 
 
         // ドラッグ移動用の変数
         private bool dragging = false;
         private Point dragStart;
-        private Timer autoSaveTimer;
-        private bool needsSave = false;
+
+        // デバウンス用タイマー
+        private System.Windows.Forms.Timer textSaveTimer;
+        
+        // 復元中フラグ
+        private bool isRestoring = false;
 
         // サイズ変更用の変数
         private bool resizing = false;
@@ -87,8 +89,8 @@ namespace StickyNoteApp
         public StickyNoteForm()
         {
             InitializeComponent();            // フォームデザイナーで設定したUI要素の初期化
+            InitializeTextSaveTimer();        // デバウンス用タイマーの初期化
             InitializeEventHandlers();        // 付箋内容変更検知用のイベントハンドラーの初期化
-            InitializeAutoSave();             // 自動保存タイマーの初期化
             InitializeResizeHandlers();       // サイズ変更ハンドラーの初期化（リサイズ機能）
             InitializeReminder();             // リマインダー管理の初期化
             InitializePictureBox();           // 画面キャプチャ用のPictureBox初期化
@@ -100,15 +102,64 @@ namespace StickyNoteApp
         }
 
         /// <summary>
+        /// デバウンス用タイマーの初期化
+        /// </summary>
+        private void InitializeTextSaveTimer()
+        {
+            textSaveTimer = new System.Windows.Forms.Timer();
+            textSaveTimer.Interval = TEXT_SAVE_DELAY_MS;
+            textSaveTimer.Tick += TextSaveTimer_Tick;
+        }
+
+        /// <summary>
+        /// デバウンス用タイマーのティック処理
+        /// </summary>
+        private void TextSaveTimer_Tick(object sender, EventArgs e)
+        {
+            textSaveTimer.Stop();
+            SaveCurrentNoteState();
+            System.Diagnostics.Debug.WriteLine($"[{NoteId}] テキスト変更→保存（デバウンス）");
+        }
+
+        /// <summary>
         /// 付箋内容変更検知用のイベントハンドラーの初期化
         /// </summary>
         private void InitializeEventHandlers()
         {
-            // イベントハンドラー登録
-            this.txtNote.TextChanged += StickyNoteContentChanged;
-            this.LocationChanged += OnLocationChanged;
-            this.SizeChanged += OnSizeChanged;
-            this.BackColorChanged += StickyNoteContentChanged;
+            // テキスト変更時：入力が確定したタイミングで保存
+            this.txtNote.TextChanged += TxtNote_TextChanged;
+
+            // 位置・サイズ変更は操作完了時に保存（ドラッグ/リサイズ終了時）
+            // LocationChanged/SizeChangedイベントは登録しない
+
+            // 背景色変更時：色変更操作完了時に保存
+            this.BackColorChanged += BackColor_Changed;
+        }
+
+        /// <summary>
+        /// テキスト変更時の処理
+        /// </summary>
+        private void TxtNote_TextChanged(object sender, EventArgs e)
+        {
+            // 復元中は保存しない
+            if (isRestoring) return;
+
+            // タイマーをリセットして再スタート（デバウンス）
+            textSaveTimer.Stop();
+            textSaveTimer.Start();
+        }
+
+        /// <summary>
+        /// 背景色変更時の処理
+        /// </summary>
+        private void BackColor_Changed(object sender, EventArgs e)
+        {
+            // 復元中は保存しない
+            if (isRestoring) return;
+
+            // 色変更完了時に保存
+            SaveCurrentNoteState();
+            System.Diagnostics.Debug.WriteLine($"[{NoteId}] 背景色変更→保存");
         }
 
         /// <summary>
@@ -189,13 +240,15 @@ namespace StickyNoteApp
             {
                 resizing = false;
                 resizeDirection = ResizeDirection.None;
-                needsSave = true;
+
+                // サイズ変更完了時に保存
+                SaveCurrentNoteState();
 
                 // テキスト選択を再有効化
                 this.txtNote.Focus();
                 this.txtNote.Cursor = Cursors.IBeam;
 
-                System.Diagnostics.Debug.WriteLine($"[{NoteId}] サイズ変更終了: {this.Width}x{this.Height}");
+                System.Diagnostics.Debug.WriteLine($"[{NoteId}] サイズ変更終了→保存: {this.Width}x{this.Height}");
             }
         }
 
@@ -274,8 +327,11 @@ namespace StickyNoteApp
             {
                 resizing = false;
                 resizeDirection = ResizeDirection.None;
-                needsSave = true;
-                System.Diagnostics.Debug.WriteLine($"[{NoteId}] サイズ変更終了: {this.Width}x{this.Height}");
+
+                // サイズ変更完了時に保存
+                SaveCurrentNoteState();
+
+                System.Diagnostics.Debug.WriteLine($"[{NoteId}] サイズ変更終了→保存: {this.Width}x{this.Height}");
             }
         }
 
@@ -437,18 +493,6 @@ namespace StickyNoteApp
         }
 
         /// <summary>
-        /// 自動保存タイマーの初期化
-        /// </summary>
-        private void InitializeAutoSave()
-        {
-            // タイマー設定
-            autoSaveTimer = new Timer();
-            autoSaveTimer.Interval = AUTO_SAVE_INTERVAL_MS;
-            autoSaveTimer.Tick += AutoSaveTimer_Tick;
-            autoSaveTimer.Start();
-        }
-
-        /// <summary>
         /// リマインダーの初期化
         /// </summary>
         private void InitializeReminder()
@@ -464,7 +508,40 @@ namespace StickyNoteApp
                 System.Diagnostics.Debug.WriteLine($"[{NoteId}] リマインダー通知表示");
             };
         }
-        
+
+        /// <summary>
+        /// 現在の付箋状態を保存
+        /// ReminderManagerから呼ばれる保存メソッド
+        /// </summary>
+        public void SaveCurrentNoteState()
+        {
+            try
+            {
+                // 現在の付箋情報をすべてDatabase.SaveOrUpdate()に渡す
+                Database.SaveOrUpdate(this);
+
+                string preview = string.IsNullOrEmpty(txtNote.Text) ? "(空)" :
+                    (txtNote.Text.Length > PREVIEW_TEXT_MAX_LENGTH ?
+                     txtNote.Text.Substring(0, PREVIEW_TEXT_MAX_LENGTH) + "..." :
+                     txtNote.Text);
+
+                System.Diagnostics.Debug.WriteLine($"✓ 保存成功 [{NoteId}]: '{preview}' at ({Left},{Top}) size ({Width}x{Height})");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"✗ 保存エラー [{NoteId}]: {ex.Message}");
+                // エラーメッセージは表示しない（連続保存でダイアログが出続けるのを防ぐ）
+                //MessageBox.Show($"保存エラー:\n{ex.Message}", "エラー");
+            }
+        }
+
+        /// <summary>
+        /// リマインダーマネージャーを取得
+        /// </summary>
+        public ReminderManager GetReminderManager()
+        {
+            return reminderManager;
+        }
 
         // DBから読み込んだリマインダー情報を設定
         /// <summary>
@@ -633,8 +710,11 @@ namespace StickyNoteApp
                 // テキストボックスの位置を調整
                 txtNote.Top = pictureBox.Bottom;
                 txtNote.Height = this.ClientSize.Height - txtNote.Top;
-                needsSave = true;
-                System.Diagnostics.Debug.WriteLine($"[{NoteId}] 画像サイズ変更: {height}px");
+
+                // 画像サイズ変更完了時に保存
+                SaveCurrentNoteState();
+
+                System.Diagnostics.Debug.WriteLine($"[{NoteId}] 画像サイズ変更→保存: {height}px");
             }
         }
 
@@ -687,57 +767,11 @@ namespace StickyNoteApp
             capturedImagePath = null;
             // テキストボックスの位置を調整
             txtNote.Dock = DockStyle.Fill;
-            needsSave = true;
-        }
 
-        /// <summary>
-        /// 位置変更時の処理
-        /// </summary>
-        private void OnLocationChanged(object sender, EventArgs e)
-        {
-            // ドラッグ中またはサイズ変更中は保存フラグを立てない
-            // （ドラッグ終了時、サイズ変更終了時に立てる
-            if (!dragging && !resizing)
-            {
-                needsSave = true;
-                System.Diagnostics.Debug.WriteLine($"[{NoteId}] 位置変更検出");
-            }
-        }
+            // 画像削除完了時に保存
+            SaveCurrentNoteState();
 
-        /// <summary>
-        /// サイズ変更時の処理
-        /// </summary>
-        private void OnSizeChanged(object sender, EventArgs e)
-        {
-            // サイズ変更中は保存フラグを立てない
-            // （サイズ変更終了時に立てる
-            if (!resizing)
-            {
-                needsSave = true;
-                System.Diagnostics.Debug.WriteLine($"[{NoteId}] サイズ変更検出");
-            }
-        }
-
-        /// <summary>
-        /// 内容変更時の処理(付箋の表示内容や状態が変更された時)
-        /// </summary>
-        public void StickyNoteContentChanged(object sender, EventArgs e) // publicへ変更
-        {
-            needsSave = true;
-            System.Diagnostics.Debug.WriteLine($"[{NoteId}] 変更検出");
-        }
-
-        /// <summary>
-        /// 自動保存タイマーのティック処理
-        /// </summary>
-        private void AutoSaveTimer_Tick(object sender, EventArgs e)
-        {
-            if (needsSave)
-            {
-                System.Diagnostics.Debug.WriteLine($"[{NoteId}] 自動保存実行中...");
-                SaveNote();
-                needsSave = false;
-            }
+            System.Diagnostics.Debug.WriteLine($"[{NoteId}] 画像削除→保存");
         }
 
         /// <summary>
@@ -771,8 +805,11 @@ namespace StickyNoteApp
             if (dragging)
             {
                 dragging = false;
-                needsSave = true;
-                System.Diagnostics.Debug.WriteLine($"[{NoteId}] ドラッグ終了");
+
+                // ドラッグ移動完了時に保存
+                SaveCurrentNoteState();
+
+                System.Diagnostics.Debug.WriteLine($"[{NoteId}] ドラッグ終了→保存");
             }
         }
 
@@ -807,8 +844,11 @@ namespace StickyNoteApp
         private void topMostMenuItem_Click(object sender, EventArgs e)
         {
             this.TopMost = topMostMenuItem.Checked;
-            needsSave = true;
-            System.Diagnostics.Debug.WriteLine($"[{NoteId}] 最前面表示: {this.TopMost}");
+
+            // 最前面表示切り替え完了時に保存
+            SaveCurrentNoteState();
+
+            System.Diagnostics.Debug.WriteLine($"[{NoteId}] 最前面表示切り替え→保存: {this.TopMost}");
         }
 
         /// <summary>
@@ -841,7 +881,7 @@ namespace StickyNoteApp
         private void ChangeColor(Color color)
         {
             // BackColorChangedイベントを一時的に解除
-            this.BackColorChanged -= StickyNoteContentChanged;
+            this.BackColorChanged -= BackColor_Changed;
             // テキストボックスの色のみを変更
             this.txtNote.BackColor = color;
             // データベース保存用にフォームのBackColorも更新
@@ -849,9 +889,12 @@ namespace StickyNoteApp
             // タイトルバーの色を確実に固定（念のため再設定）
             this.titleBar.BackColor = Color.WhiteSmoke;
             // イベントを再登録
-            this.BackColorChanged += StickyNoteContentChanged;
-            needsSave = true;
-            System.Diagnostics.Debug.WriteLine($"[{NoteId}] 色変更: {color.Name}");
+            this.BackColorChanged += BackColor_Changed;
+
+            // 色変更完了時に保存
+            SaveCurrentNoteState();
+
+            System.Diagnostics.Debug.WriteLine($"[{NoteId}] 色変更→保存: {color.Name}");
         }
 
         /// <summary>
@@ -963,9 +1006,11 @@ namespace StickyNoteApp
                         txtNote.Height = this.ClientSize.Height - txtNote.Top;
 
                         capturedImagePath = imagePath;
-                        needsSave = true;
 
-                        System.Diagnostics.Debug.WriteLine($"[{NoteId}] クリップボード画像貼り付け完了: {imagePath}");
+                        // 画像貼り付け完了時に保存
+                        SaveCurrentNoteState();
+
+                        System.Diagnostics.Debug.WriteLine($"[{NoteId}] クリップボード画像貼り付け→保存: {imagePath}");
                     }
                 }
                 else
@@ -1010,9 +1055,11 @@ namespace StickyNoteApp
                 txtNote.Height = this.ClientSize.Height - txtNote.Top;
 
                 capturedImagePath = imagePath;
-                needsSave = true;
 
-                System.Diagnostics.Debug.WriteLine($"[{NoteId}] 画像キャプチャ完了: {imagePath}");
+                // 画像キャプチャ完了時に保存
+                SaveCurrentNoteState();
+
+                System.Diagnostics.Debug.WriteLine($"[{NoteId}] 画像キャプチャ→保存: {imagePath}");
             }
             catch (Exception ex)
             {
@@ -1124,12 +1171,36 @@ namespace StickyNoteApp
         /// </summary>
         public void SetText(string text)
         {
+            // 復元中フラグを立てる
+            isRestoring = true;
+
             // イベントを一時的に解除
-            this.txtNote.TextChanged -= StickyNoteContentChanged;
+            this.txtNote.TextChanged -= TxtNote_TextChanged;
             txtNote.Text = text;
             // イベントを再登録
-            this.txtNote.TextChanged += StickyNoteContentChanged;
+            this.txtNote.TextChanged += TxtNote_TextChanged;
             System.Diagnostics.Debug.WriteLine($"[{NoteId}] テキスト設定: {text}");
+
+            // 復元中フラグを下ろす
+            isRestoring = false;
+
+        }
+        // 新規メソッド追加
+
+        /// <summary>
+        /// 復元処理の開始を通知
+        /// </summary>
+        public void BeginRestore()
+        {
+            isRestoring = true;
+        }
+
+        /// <summary>
+        /// 復元処理の終了を通知
+        /// </summary>
+        public void EndRestore()
+        {
+            isRestoring = false;
         }
 
         /// <summary>
@@ -1142,29 +1213,6 @@ namespace StickyNoteApp
         }
 
         /// <summary>
-        /// 付箋データを保存
-        /// </summary>
-        private void SaveNote()
-        {
-            try
-            {
-                Database.SaveOrUpdate(this);
-
-                string preview = string.IsNullOrEmpty(txtNote.Text) ? "(空)" :
-                    (txtNote.Text.Length > PREVIEW_TEXT_MAX_LENGTH ?
-                     txtNote.Text.Substring(0, PREVIEW_TEXT_MAX_LENGTH) + "..." :
-                     txtNote.Text);
-
-                System.Diagnostics.Debug.WriteLine($"✓ 保存成功 [{NoteId}]: '{preview}' at ({Left},{Top}) size ({Width}x{Height})");
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"✗ 保存エラー [{NoteId}]: {ex.Message}");
-                MessageBox.Show($"保存エラー:\n{ex.Message}", "エラー");
-            }
-        }
-
-        /// <summary>
         /// フォームクローズ時の処理
         /// フォームが閉じられる直前に自動的に呼び出されます（×ボタン、Alt+F4、Close()メソッドなど）。
         /// </summary>
@@ -1174,11 +1222,11 @@ namespace StickyNoteApp
 
             System.Diagnostics.Debug.WriteLine($"[{NoteId}] フォームクローズ");
 
-            // タイマー停止
-            if (autoSaveTimer != null)
+            // デバウンスタイマー停止を追加
+            if (textSaveTimer != null)
             {
-                autoSaveTimer.Stop();
-                autoSaveTimer.Dispose();
+                textSaveTimer.Stop();
+                textSaveTimer.Dispose();
             }
 
             if (reminderManager != null)
@@ -1193,12 +1241,9 @@ namespace StickyNoteApp
                 pictureBox.Image = null;
             }
 
-            // 最終保存
-            if (needsSave)
-            {
-                System.Diagnostics.Debug.WriteLine($"[{NoteId}] 最終保存実行");
-                SaveNote();
-            }
+            // フォームクローズ時に最終保存
+            System.Diagnostics.Debug.WriteLine($"[{NoteId}] 最終保存実行");
+            SaveCurrentNoteState();
         }
     }
 }
