@@ -26,6 +26,9 @@ namespace StickyNoteApp
         private const int MAX_REMINDER_HOURS = 24; // リマインダーとして設定できる最大時間（24時間）
         private const int MAX_REMINDER_MINUTES = MAX_REMINDER_HOURS * MINUTES_PER_HOUR; // 設定可能な最大時間（1440分＝24時間ちょうどまでOK）
 
+        private const int COLUMN_NOT_FOUND = -1; // カラムが見つからない場合の値
+        private const int REMINDER_ENABLED = 1; // リマインダー有効フラグの値
+
         // Timerの宣言を明示的にSystem.Windows.Forms.Timerに変更
         private System.Windows.Forms.Timer reminderTimer;
         private DateTime reminderTime;
@@ -36,8 +39,10 @@ namespace StickyNoteApp
         // インスタンス管理用（デバッグ確認用）
         private static int instanceCount = 0;
 
+        // 親フォーム（StickyNoteForm）への参照。親フォームを覚えておく
+        private StickyNoteForm parentForm;
+
         public event EventHandler ReminderTriggered; // リマインダー発火イベント
-        public event EventHandler ReminderStateChanged; // リマインダー状態変更イベント(編集要：変更しているタイミングで保存する処理を呼ぶで作る）
 
         /// <summary>
         /// リマインダーが設定されているか
@@ -50,12 +55,15 @@ namespace StickyNoteApp
         public DateTime ReminderTime => reminderTime;
 
         /// <summary>
-        /// コンストラクタ（インスタンス作成ログ）
+        /// コンストラクタ（親フォームを受け取る）
         /// </summary>
-        public ReminderManager()
+        public ReminderManager(StickyNoteForm parent)
         {
+            // 親フォームを保存
+            this.parentForm = parent;
+
             System.Diagnostics.Debug.WriteLine($"[ReminderManager] ctor Hash={this.GetHashCode()} Thread={Thread.CurrentThread.ManagedThreadId}");
-            Interlocked.Increment(ref instanceCount);
+            Interlocked.Increment(ref instanceCount); // インスタンス数をインクリメント
             System.Diagnostics.Debug.WriteLine($"[ReminderManager] instanceCount={instanceCount}");
         }
 
@@ -124,6 +132,83 @@ namespace StickyNoteApp
         }
 
         /// <summary>
+        /// データベースから読み込んだ付箋データをもとに、
+        /// 有効かつ未来の時刻に設定されているリマインダーのみを復元する。
+        /// リマインダーが復元された場合は true、復元されなかった場合は false を返す。
+        /// </summary>
+        public bool RestoreReminderFromDatabase(string noteId, string content, Microsoft.Data.Sqlite.SqliteDataReader reader)
+        {
+            try
+            {
+                // ReminderActiveカラムの存在確認と読み取り
+                int reminderActiveOrdinal = COLUMN_NOT_FOUND;
+                int reminderTimeOrdinal = COLUMN_NOT_FOUND;
+
+                try
+                {
+                    reminderActiveOrdinal = reader.GetOrdinal("ReminderActive");
+                    reminderTimeOrdinal = reader.GetOrdinal("ReminderTime");
+                }
+                catch
+                {
+                    // カラムが存在しない場合は復元不要
+                    System.Diagnostics.Debug.WriteLine($"[{noteId}] リマインダーカラムが存在しません");
+                    return false;
+                }
+
+                // リマインダーが有効かチェック
+                if (reader.IsDBNull(reminderActiveOrdinal))
+                {
+                    return false;
+                }
+
+                // リマインダーが「有効(1)」かどうかを数値でチェック
+                int reminderActive = Convert.ToInt32(reader.GetValue(reminderActiveOrdinal));
+                if (reminderActive != REMINDER_ENABLED) // 1 = 有効
+                {
+                    return false;
+                }
+
+                // リマインダー時刻を取得
+                if (reader.IsDBNull(reminderActiveOrdinal))
+                {
+                    return false;
+                }
+
+                string reminderTimeStr = reader.GetString(reminderActiveOrdinal);
+                if (string.IsNullOrEmpty(reminderTimeStr))
+                {
+                    return false;
+                }
+
+                DateTime reminderTime = DateTime.Parse(reminderTimeStr);
+
+                // 未来の時刻のみ復元
+                if (reminderTime <= DateTime.Now)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[{noteId}] リマインダー時刻が過去のため無効化: {reminderTime:yyyy-MM-dd HH:mm:ss}");
+                    return false;
+                }
+
+                // リマインダーを復元
+                RestoreReminder(noteId, content, reminderTime);
+
+                TimeSpan timeLeft = reminderTime - DateTime.Now;
+                System.Diagnostics.Debug.WriteLine(
+                    $"[{noteId}] リマインダー復元成功: {reminderTime:yyyy-MM-dd HH:mm:ss} (残り{timeLeft.TotalMinutes:F1}分)"
+                );
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[{noteId}] リマインダー復元エラー: {ex.Message}");
+                return false;
+            }
+        }
+
+
+        /// <summary>
         /// リマインダーを設定
         /// </summary>
         public void SetReminder(string noteId, string content, int minutes)
@@ -166,8 +251,8 @@ namespace StickyNoteApp
                 reminderTimer.Tick += ReminderTimer_Tick;
                 reminderTimer.Start();
 
-                // 状態変更イベントを発火（保存のため） →編集要：変更しているタイミングで保存する処理を呼ぶで作る
-                ReminderStateChanged?.Invoke(this, EventArgs.Empty);
+                // 状態変更完了時に保存処理を呼ぶ
+                SaveReminderState();
 
                 System.Diagnostics.Debug.WriteLine($"[{noteId}] リマインダー設定: {minutes}分後 ({reminderTime:HH:mm:ss}) Thread={Thread.CurrentThread.ManagedThreadId}");
             }
@@ -197,8 +282,8 @@ namespace StickyNoteApp
 
                 isActive = false;
 
-                // 状態変更イベントを発火（保存のため） →編集要：変更しているタイミングで保存する処理を呼ぶで作る
-                ReminderStateChanged?.Invoke(this, EventArgs.Empty);
+                // 状態変更完了時に保存処理を呼ぶ
+                SaveReminderState();
 
                 System.Diagnostics.Debug.WriteLine($"[{noteId}] リマインダーキャンセル Thread={Thread.CurrentThread.ManagedThreadId}");
             }
@@ -227,10 +312,11 @@ namespace StickyNoteApp
                     reminderTimer.Tick -= ReminderTimer_Tick; // イベント解除
                     isActive = false;
 
-                    // 先に状態変更イベント（保存） →編集要：変更しているタイミングで保存する処理を呼ぶで作る
-                    ReminderStateChanged?.Invoke(this, EventArgs.Empty);
+                    // 状態変更完了時に保存処理を呼ぶ（リマインダー解除状態を保存）
+                    SaveReminderState();
 
-                    // 付箋側で最前面化するハンドラを先に実行させるため、ReminderTriggered を先に発火
+                    // 保存完了後、付箋を最前面に表示してから通知ダイアログを出す
+                    // （順番：保存 → 付箋を前面に → 通知表示）
                     ReminderTriggered?.Invoke(this, EventArgs.Empty);
 
                     // 通知を表示
@@ -254,6 +340,32 @@ namespace StickyNoteApp
                 {
                     // タイマー停止にも失敗した場合は何もしない
                 }
+            }
+        }
+
+        /// <summary>
+        /// リマインダー状態を保存
+        /// 状態変更完了時に呼ばれる保存処理
+        /// </summary>
+        private void SaveReminderState()
+        {
+            try
+            {
+                if (parentForm == null)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[{noteId}] SaveReminderState: 親フォームが未設定");
+                    return;
+                }
+
+                // 親フォームに付箋の保存を依頼
+                // 親フォーム側で現在の付箋の全情報をDatabase.SaveOrUpdate()に渡す
+                parentForm.SaveCurrentNoteState();
+
+                System.Diagnostics.Debug.WriteLine($"[{noteId}] リマインダー状態を保存 (IsActive={isActive})");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[{noteId}] リマインダー状態保存エラー: {ex.Message}");
             }
         }
 
@@ -342,6 +454,7 @@ namespace StickyNoteApp
                 MessageBox.Show($"ダイアログの表示に失敗しました。\n\n{ex.Message}", "エラー",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+
         }
 
         /// <summary>
