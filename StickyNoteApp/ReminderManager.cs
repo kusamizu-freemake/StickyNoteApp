@@ -170,12 +170,12 @@ namespace StickyNoteApp
                 }
 
                 // リマインダー時刻を取得
-                if (reader.IsDBNull(reminderActiveOrdinal))
+                if (reader.IsDBNull(reminderTimeOrdinal))
                 {
                     return false;
                 }
 
-                string reminderTimeStr = reader.GetString(reminderActiveOrdinal);
+                string reminderTimeStr = reader.GetString(reminderTimeOrdinal);
                 if (string.IsNullOrEmpty(reminderTimeStr))
                 {
                     return false;
