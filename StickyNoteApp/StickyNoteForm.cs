@@ -114,7 +114,7 @@ namespace StickyNoteApp
             this.BackColorChanged += BackColor_Changed;
         }
         /// <summary>
-        /// テキストボックスからフォーカスが外れた時の処理(追加)
+        /// テキストボックスからフォーカスが外れた時の処理
         /// </summary>
         private void TxtNote_Leave(object sender, EventArgs e)
         {
