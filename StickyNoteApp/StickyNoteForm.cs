@@ -104,8 +104,10 @@ namespace StickyNoteApp
         /// </summary>
         private void InitializeEventHandlers()
         {
-            // テキストボックスからフォーカスが外れた時に保存へ変更
-            this.txtNote.Leave += TxtNote_Leave;
+
+            // Leaveの代わりにDeactivateを使用
+            // フォームが非アクティブになった時に保存
+            this.Deactivate += StickyNoteForm_Deactivate;
 
             // 位置・サイズ変更は操作完了時に保存（ドラッグ/リサイズ終了時）
             // LocationChanged/SizeChangedイベントは登録しない
@@ -114,10 +116,13 @@ namespace StickyNoteApp
             this.BackColorChanged += BackColor_Changed;
         }
         /// <summary>
-        /// テキストボックスからフォーカスが外れた時の処理
+        /// 付箋ウィンドウが非アクティブ（フォーカスを失った）になったときに呼ばれる処理。
+        /// 復元処理中でなければ、現在の付箋の状態を保存する。
+        /// また、最前面表示（TopMost）が無効な場合は、再度付箋を前面に表示する。
         /// </summary>
-        private void TxtNote_Leave(object sender, EventArgs e)
+        private void StickyNoteForm_Deactivate(object sender, EventArgs e)
         {
+
             // 復元中は保存しない
             if (isRestoring) return;
 
@@ -501,6 +506,7 @@ namespace StickyNoteApp
         {
             try
             {
+
                 // 現在の付箋情報をすべてDatabase.SaveOrUpdate()に渡す
                 Database.SaveOrUpdate(this);
 

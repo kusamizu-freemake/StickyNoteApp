@@ -326,20 +326,33 @@ namespace StickyNoteApp
         /// </summary>
         public static SqliteDataReader LoadAll()
         {
+            SqliteConnection con = null;
+            SqliteCommand cmd = null;
+
             try
             {
+                // 接続を作成して開く
                 // DataReaderを呼び出し元で使用するため、このメソッド内ではusingを使わずに接続をopenする
-                var con = CreateConnection();
+                con = CreateConnection();
                 con.Open();//← ここでopen
 
-                var cmd = con.CreateCommand();
+                // コマンドを作成
+                cmd = con.CreateCommand();
                 cmd.CommandText = "SELECT * FROM StickyNotes WHERE DeleteFlag = 0 ORDER BY CreatedAt ASC";
 
                 // CloseConnectionを指定すると、ReaderがCloseされたタイミングで、接続も自動的にCloseされる
+                // ※ ただし、ExecuteReader 中に例外が発生した場合は自動では Close されない点に注意
                 return cmd.ExecuteReader(System.Data.CommandBehavior.CloseConnection);
             }
             catch (Exception ex)
             {
+                // 例外発生時はまだ Reader が返っておらず自動で Close されない可能性があるため、
+                // 接続（con）とコマンド（cmd）をここで明示的に後始末する。
+                // Disposeは内部でCloseも呼ぶため、Close() を個別に呼ぶ必要はなく Dispose() だけで十分
+                // 
+                cmd?.Dispose();
+                con?.Dispose();
+
                 throw new Exception($"データ読み込みエラー: {ex.Message}", ex);
             }
         }
