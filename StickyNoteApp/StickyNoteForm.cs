@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Drawing;
 using System.Windows.Forms;
 
@@ -35,15 +36,12 @@ namespace StickyNoteApp
         private const int REMINDER_TIME_10MIN = 10; // 10分
         private const int REMINDER_TIME_30MIN = 30; // 30分
         private const int REMINDER_TIME_60MIN = 60; // 60分
-        private const int TEXT_SAVE_DELAY_MS = 5000; // テキスト保存までの遅延時間（ミリ秒）→5秒
 
 
         // ドラッグ移動用の変数
         private bool dragging = false;
         private Point dragStart;
 
-        // デバウンス用タイマー
-        private System.Windows.Forms.Timer textSaveTimer;
         
         // 復元中フラグ
         private bool isRestoring = false;
@@ -89,7 +87,6 @@ namespace StickyNoteApp
         public StickyNoteForm()
         {
             InitializeComponent();            // フォームデザイナーで設定したUI要素の初期化
-            InitializeTextSaveTimer();        // デバウンス用タイマーの初期化
             InitializeEventHandlers();        // 付箋内容変更検知用のイベントハンドラーの初期化
             InitializeResizeHandlers();       // サイズ変更ハンドラーの初期化（リサイズ機能）
             InitializeReminder();             // リマインダー管理の初期化
@@ -101,33 +98,16 @@ namespace StickyNoteApp
             System.Diagnostics.Debug.WriteLine($"付箋作成: ID={NoteId}");
         }
 
-        /// <summary>
-        /// デバウンス用タイマーの初期化
-        /// </summary>
-        private void InitializeTextSaveTimer()
-        {
-            textSaveTimer = new System.Windows.Forms.Timer();
-            textSaveTimer.Interval = TEXT_SAVE_DELAY_MS;
-            textSaveTimer.Tick += TextSaveTimer_Tick;
-        }
-
-        /// <summary>
-        /// デバウンス用タイマーのティック処理
-        /// </summary>
-        private void TextSaveTimer_Tick(object sender, EventArgs e)
-        {
-            textSaveTimer.Stop();
-            SaveCurrentNoteState();
-            System.Diagnostics.Debug.WriteLine($"[{NoteId}] テキスト変更→保存（デバウンス）");
-        }
 
         /// <summary>
         /// 付箋内容変更検知用のイベントハンドラーの初期化
         /// </summary>
         private void InitializeEventHandlers()
         {
-            // テキスト変更時：入力が確定したタイミングで保存
-            this.txtNote.TextChanged += TxtNote_TextChanged;
+
+            // Leaveの代わりにDeactivateを使用
+            // フォームが非アクティブになった時に保存
+            this.Deactivate += StickyNoteForm_Deactivate;
 
             // 位置・サイズ変更は操作完了時に保存（ドラッグ/リサイズ終了時）
             // LocationChanged/SizeChangedイベントは登録しない
@@ -135,19 +115,28 @@ namespace StickyNoteApp
             // 背景色変更時：色変更操作完了時に保存
             this.BackColorChanged += BackColor_Changed;
         }
-
         /// <summary>
-        /// テキスト変更時の処理
+        /// 付箋ウィンドウが非アクティブ（フォーカスを失った）になったときに呼ばれる処理。
+        /// 復元処理中でなければ、現在の付箋の状態を保存する。
+        /// また、最前面表示（TopMost）が無効な場合は、再度付箋を前面に表示する。
         /// </summary>
-        private void TxtNote_TextChanged(object sender, EventArgs e)
+        private void StickyNoteForm_Deactivate(object sender, EventArgs e)
         {
+
             // 復元中は保存しない
             if (isRestoring) return;
 
-            // タイマーをリセットして再スタート（デバウンス）
-            textSaveTimer.Stop();
-            textSaveTimer.Start();
+            SaveCurrentNoteState();
+            System.Diagnostics.Debug.WriteLine($"[{NoteId}] フォーカス喪失→保存");
+
+            // TopMostが無効な場合、付箋を前面に戻す
+            if (!this.TopMost)
+            {
+                this.BringToFront();
+                System.Diagnostics.Debug.WriteLine($"[{NoteId}] フォーカス喪失後に前面表示");
+            }
         }
+
 
         /// <summary>
         /// 背景色変更時の処理
@@ -517,6 +506,7 @@ namespace StickyNoteApp
         {
             try
             {
+
                 // 現在の付箋情報をすべてDatabase.SaveOrUpdate()に渡す
                 Database.SaveOrUpdate(this);
 
@@ -1173,12 +1163,8 @@ namespace StickyNoteApp
         {
             // 復元中フラグを立てる
             isRestoring = true;
-
-            // イベントを一時的に解除
-            this.txtNote.TextChanged -= TxtNote_TextChanged;
+            
             txtNote.Text = text;
-            // イベントを再登録
-            this.txtNote.TextChanged += TxtNote_TextChanged;
             System.Diagnostics.Debug.WriteLine($"[{NoteId}] テキスト設定: {text}");
 
             // 復元中フラグを下ろす
@@ -1201,6 +1187,7 @@ namespace StickyNoteApp
         public void EndRestore()
         {
             isRestoring = false;
+            System.Diagnostics.Debug.WriteLine($"[{NoteId}] 復元処理終了");
         }
 
         /// <summary>
@@ -1222,12 +1209,6 @@ namespace StickyNoteApp
 
             System.Diagnostics.Debug.WriteLine($"[{NoteId}] フォームクローズ");
 
-            // デバウンスタイマー停止を追加
-            if (textSaveTimer != null)
-            {
-                textSaveTimer.Stop();
-                textSaveTimer.Dispose();
-            }
 
             if (reminderManager != null)
             {

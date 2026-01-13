@@ -6,9 +6,20 @@ namespace StickyNoteApp
 {
     /// <summary>
     /// SQLiteデータベース管理クラス
+    /// ※ DB操作ごとに接続(open)し、処理完了後にcloseする設計
     /// </summary>
     public static class Database
     {
+        // 定数定義
+        private const int DB_LOCK_RETRY_DELAY_MS = 50; // DBロック解放待ち時間（ミリ秒）
+
+
+        // 「SQLite Error 5: 'database is locked'.」防止
+        // ロックエラー対策用フラグ
+        private static bool isSaving = false;
+        // DB保存処理の排他制御用ロックオブジェクト
+        private static readonly object saveLock = new object();
+
         // データベースファイルのパス
         private static readonly string DbPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -25,7 +36,16 @@ namespace StickyNoteApp
         public static string GetConnectionString() => ConnectionString;
 
         /// <summary>
-        /// データベース初期化
+        /// 新しいDB接続を生成する（都度接続用）
+        /// ※この時点ではopenされていない
+        /// </summary>
+        private static SqliteConnection CreateConnection()
+        {
+            return new SqliteConnection(ConnectionString);
+        }
+
+        /// <summary>
+        /// データベース初期化（アプリ起動時に1回だけ呼ぶ）
         /// </summary>
         public static void InitializeDatabase()
         {
@@ -45,9 +65,9 @@ namespace StickyNoteApp
                 }
 
                 // テーブル作成
-                using (SqliteConnection con = new SqliteConnection(ConnectionString))
+                using (SqliteConnection con = CreateConnection())
                 {
-                    con.Open();
+                    con.Open();//← ここでDBに接続
 
                     // StickyNotesテーブル存在確認
                     if (!TableExists(con, "StickyNotes"))
@@ -77,7 +97,7 @@ namespace StickyNoteApp
                             AddColumn(con, "StickyNotes", "ReminderTime", "TEXT");
                         }
                     }
-                }
+                } //← usingを抜けると自動的にclose
 
                 System.Diagnostics.Debug.WriteLine("データベース初期化完了");
             }
@@ -177,67 +197,85 @@ namespace StickyNoteApp
         /// </summary>
         public static void SaveOrUpdate(StickyNoteForm note)
         {
-            try
+            //  順番待ち処理（ロックエラー防止）
+            lock (saveLock)
             {
-                using (SqliteConnection con = new SqliteConnection(ConnectionString))
+                // 他の保存処理が終わるまで待つ
+                while (isSaving)
                 {
-                    con.Open();
-
-                    // UPSERTクエリ(リマインダー関連追加）
-                    string sql = @"
-                        INSERT INTO StickyNotes
-                        (Id, Content, PosX, PosY, Width, Height, BgR, BgG, BgB, TopMostFlag, DeleteFlag, ImagePath, 
-                         ReminderActive, ReminderTime, CreatedAt, UpdatedAt)
-                        VALUES
-                        ($Id, $Content, $PosX, $PosY, $Width, $Height, $BgR, $BgG, $BgB, $TopMostFlag, 0, $ImagePath,
-                         $ReminderActive, $ReminderTime, $CreatedAt, $UpdatedAt)
-                        ON CONFLICT(Id) DO UPDATE SET
-                            Content = excluded.Content,
-                            PosX = excluded.PosX,
-                            PosY = excluded.PosY,
-                            Width = excluded.Width,
-                            Height = excluded.Height,
-                            BgR = excluded.BgR,
-                            BgG = excluded.BgG,
-                            BgB = excluded.BgB,
-                            TopMostFlag = excluded.TopMostFlag,
-                            ImagePath = excluded.ImagePath,
-                            ReminderActive = excluded.ReminderActive,
-                            ReminderTime = excluded.ReminderTime,
-                            UpdatedAt = excluded.UpdatedAt;
-                    ";
-
-                    // UPSERT用SQLパラメータ（付箋データ）の設定
-                    using (var cmd = new SqliteCommand(sql, con))
-                    {
-                        cmd.Parameters.AddWithValue("$Id", note.NoteId);
-                        cmd.Parameters.AddWithValue("$Content", string.IsNullOrEmpty(note.txtNote.Text) ? "" : note.txtNote.Text); // 空文字対応
-                        cmd.Parameters.AddWithValue("$PosX", note.Left);
-                        cmd.Parameters.AddWithValue("$PosY", note.Top);
-                        cmd.Parameters.AddWithValue("$Width", note.Width);
-                        cmd.Parameters.AddWithValue("$Height", note.Height);
-                        cmd.Parameters.AddWithValue("$BgR", note.BackColor.R);
-                        cmd.Parameters.AddWithValue("$BgG", note.BackColor.G);
-                        cmd.Parameters.AddWithValue("$BgB", note.BackColor.B);
-                        cmd.Parameters.AddWithValue("$TopMostFlag", note.TopMost ? 1 : 0);
-                        cmd.Parameters.AddWithValue("$ImagePath", string.IsNullOrEmpty(note.CapturedImagePath) ? "" : note.CapturedImagePath); // 空文字対応
-
-                        // リマインダー情報を保存
-                        var reminderInfo = note.GetReminderInfo();
-                        cmd.Parameters.AddWithValue("$ReminderActive", reminderInfo.IsActive ? 1 : 0);
-                        cmd.Parameters.AddWithValue("$ReminderTime", reminderInfo.IsActive ? reminderInfo.ReminderTime.ToString("yyyy-MM-dd HH:mm:ss") : "");
-
-                        cmd.Parameters.AddWithValue("$CreatedAt", note.CreatedAt);
-                        cmd.Parameters.AddWithValue("$UpdatedAt", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
-
-                        // INSERTまたはUPDATE を実行 
-                        cmd.ExecuteNonQuery();
-                    }
+                    System.Threading.Thread.Sleep(DB_LOCK_RETRY_DELAY_MS); // 50ミリ秒待機
                 }
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"データ保存エラー: {ex.Message}", ex);
+
+                // 保存開始フラグを立てる
+                isSaving = true;
+
+                try
+                {
+                    using (SqliteConnection con = CreateConnection())
+                    {
+                        con.Open();//← 保存処理開始時にopen
+
+                        // UPSERTクエリ(リマインダー関連追加）
+                        string sql = @"
+                            INSERT INTO StickyNotes
+                            (Id, Content, PosX, PosY, Width, Height, BgR, BgG, BgB, TopMostFlag, DeleteFlag, ImagePath, 
+                             ReminderActive, ReminderTime, CreatedAt, UpdatedAt)
+                            VALUES
+                            ($Id, $Content, $PosX, $PosY, $Width, $Height, $BgR, $BgG, $BgB, $TopMostFlag, 0, $ImagePath,
+                             $ReminderActive, $ReminderTime, $CreatedAt, $UpdatedAt)
+                            ON CONFLICT(Id) DO UPDATE SET
+                                Content = excluded.Content,
+                                PosX = excluded.PosX,
+                                PosY = excluded.PosY,
+                                Width = excluded.Width,
+                                Height = excluded.Height,
+                                BgR = excluded.BgR,
+                                BgG = excluded.BgG,
+                                BgB = excluded.BgB,
+                                TopMostFlag = excluded.TopMostFlag,
+                                ImagePath = excluded.ImagePath,
+                                ReminderActive = excluded.ReminderActive,
+                                ReminderTime = excluded.ReminderTime,
+                                UpdatedAt = excluded.UpdatedAt;
+                        ";
+
+                        // UPSERT用SQLパラメータ（付箋データ）の設定
+                        using (var cmd = new SqliteCommand(sql, con))
+                        {
+                            cmd.Parameters.AddWithValue("$Id", note.NoteId);
+                            cmd.Parameters.AddWithValue("$Content", string.IsNullOrEmpty(note.txtNote.Text) ? "" : note.txtNote.Text);
+                            cmd.Parameters.AddWithValue("$PosX", note.Left);
+                            cmd.Parameters.AddWithValue("$PosY", note.Top);
+                            cmd.Parameters.AddWithValue("$Width", note.Width);
+                            cmd.Parameters.AddWithValue("$Height", note.Height);
+                            cmd.Parameters.AddWithValue("$BgR", note.BackColor.R);
+                            cmd.Parameters.AddWithValue("$BgG", note.BackColor.G);
+                            cmd.Parameters.AddWithValue("$BgB", note.BackColor.B);
+                            cmd.Parameters.AddWithValue("$TopMostFlag", note.TopMost ? 1 : 0);
+                            cmd.Parameters.AddWithValue("$ImagePath", string.IsNullOrEmpty(note.CapturedImagePath) ? "" : note.CapturedImagePath);
+
+                            // リマインダー情報を保存
+                            var reminderInfo = note.GetReminderInfo();
+                            cmd.Parameters.AddWithValue("$ReminderActive", reminderInfo.IsActive ? 1 : 0);
+                            cmd.Parameters.AddWithValue("$ReminderTime", reminderInfo.IsActive ? reminderInfo.ReminderTime.ToString("yyyy-MM-dd HH:mm:ss") : "");
+
+                            cmd.Parameters.AddWithValue("$CreatedAt", note.CreatedAt);
+                            cmd.Parameters.AddWithValue("$UpdatedAt", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+
+                            // INSERTまたはUPDATE を実行 
+                            cmd.ExecuteNonQuery();
+                        }
+                    }//← usingを抜けるとclose
+                }
+                catch (Exception ex)
+                {
+                    throw new Exception($"データ保存エラー: {ex.Message}", ex);
+                }
+                finally
+                {
+                    // 保存終了フラグを下ろす（必ず実行される）
+                    isSaving = false;
+                }
             }
         }
 
@@ -246,24 +284,40 @@ namespace StickyNoteApp
         /// </summary>
         public static void SoftDelete(string id)
         {
-            try
+            // 順番待ち処理（ロックエラー防止）
+            lock (saveLock)
             {
-                using (SqliteConnection con = new SqliteConnection(ConnectionString))
+                while (isSaving)
                 {
-                    con.Open();
-                    string sql = @"UPDATE StickyNotes SET DeleteFlag = 1, UpdatedAt = $UpdatedAt WHERE Id = $Id";
-
-                    using (var cmd = new SqliteCommand(sql, con))
-                    {
-                        cmd.Parameters.AddWithValue("$Id", id);
-                        cmd.Parameters.AddWithValue("$UpdatedAt", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
-                        cmd.ExecuteNonQuery();
-                    }
+                    System.Threading.Thread.Sleep(DB_LOCK_RETRY_DELAY_MS); // 50ミリ秒待機
                 }
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"データ削除エラー: {ex.Message}", ex);
+
+                isSaving = true;
+
+                try
+                {
+                    using (SqliteConnection con = CreateConnection())
+                    {
+                        con.Open();//← 削除処理開始時にopen
+                        string sql = @"UPDATE StickyNotes SET DeleteFlag = 1, UpdatedAt = $UpdatedAt WHERE Id = $Id";
+
+                        using (var cmd = new SqliteCommand(sql, con))
+                        {
+                            cmd.Parameters.AddWithValue("$Id", id);
+                            cmd.Parameters.AddWithValue("$UpdatedAt", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+                            cmd.ExecuteNonQuery();
+                        }
+                    }//← using を抜けると close
+                }
+                catch (Exception ex)
+                {
+                    throw new Exception($"データ削除エラー: {ex.Message}", ex);
+                }
+                finally
+                {
+                    // 保存終了フラグを下ろす
+                    isSaving = false;
+                }
             }
         }
 
@@ -272,18 +326,33 @@ namespace StickyNoteApp
         /// </summary>
         public static SqliteDataReader LoadAll()
         {
+            SqliteConnection con = null;
+            SqliteCommand cmd = null;
+
             try
             {
-                var con = new SqliteConnection(ConnectionString);
-                con.Open();
+                // 接続を作成して開く
+                // DataReaderを呼び出し元で使用するため、このメソッド内ではusingを使わずに接続をopenする
+                con = CreateConnection();
+                con.Open();//← ここでopen
 
-                var cmd = con.CreateCommand();
+                // コマンドを作成
+                cmd = con.CreateCommand();
                 cmd.CommandText = "SELECT * FROM StickyNotes WHERE DeleteFlag = 0 ORDER BY CreatedAt ASC";
 
+                // CloseConnectionを指定すると、ReaderがCloseされたタイミングで、接続も自動的にCloseされる
+                // ※ ただし、ExecuteReader 中に例外が発生した場合は自動では Close されない点に注意
                 return cmd.ExecuteReader(System.Data.CommandBehavior.CloseConnection);
             }
             catch (Exception ex)
             {
+                // 例外発生時はまだ Reader が返っておらず自動で Close されない可能性があるため、
+                // 接続（con）とコマンド（cmd）をここで明示的に後始末する。
+                // Disposeは内部でCloseも呼ぶため、Close() を個別に呼ぶ必要はなく Dispose() だけで十分
+                // 
+                cmd?.Dispose();
+                con?.Dispose();
+
                 throw new Exception($"データ読み込みエラー: {ex.Message}", ex);
             }
         }

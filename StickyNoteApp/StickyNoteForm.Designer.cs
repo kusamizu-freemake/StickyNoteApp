@@ -97,6 +97,7 @@ namespace StickyNoteApp
             this.txtNote.Dock = System.Windows.Forms.DockStyle.Fill;
             this.txtNote.AcceptsTab = true;
             this.txtNote.WordWrap = true;
+            this.txtNote.Leave += new System.EventHandler(this.StickyNoteForm_Deactivate);  // ←Deactivateに変更
 
             // ------- 右クリックメニュー -------
             this.contextMenu.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
