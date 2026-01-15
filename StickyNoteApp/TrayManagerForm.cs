@@ -35,30 +35,19 @@ namespace StickyNoteApp
         // ホットキーマネージャー
         private HotkeyManager HotkeyManager;
 
-
         // 常駐開始
         public TrayManagerForm()
         {
-            System.Diagnostics.Debug.WriteLine("TrayManagerForm: コンストラクタ開始");
-
             InitializeComponent(); // フォームデザイナーで設定したUI要素の初期化
 
-            System.Diagnostics.Debug.WriteLine("TrayManagerForm: InitializeComponent完了");
-
             InitializeTray(); // トレイアイコン初期化
-
-            System.Diagnostics.Debug.WriteLine("TrayManagerForm: トレイアイコン初期化完了");
 
             // ホットキーマネージャーの初期化
             HotkeyManager = new HotkeyManager();
             HotkeyManager.NewNoteRequested += (s, e) => OnCreateNoteClicked(s, e);
             HotkeyManager.ToggleNotesRequested += (s, e) => OnShowHideAllStickyNotesClicked(s, e);
 
-            System.Diagnostics.Debug.WriteLine("TrayManagerForm: ホットキーマネージャー初期化完了");
-
             RestoreNotes(); // 付箋を復元
-
-            System.Diagnostics.Debug.WriteLine("TrayManagerForm: 付箋復元完了");
         }
 
         /// <summary>
@@ -79,7 +68,7 @@ namespace StickyNoteApp
             ToggleAllNotesMenuItem.ShortcutKeyDisplayString = "Ctrl+Shift+H";
             ToggleAllNotesMenuItem.Click += OnShowHideAllStickyNotesClicked;
             TrayMenu.Items.Add(ToggleAllNotesMenuItem);
-            // DB整合性チェック（デバッグ用。のちに削除予定）
+            // DB整合性チェック（デバッグ用。完成間際で削除予定）
             TrayMenu.Items.Add(new ToolStripSeparator()); // 区切り線
             TrayMenu.Items.Add("データベース整合性チェック", null, OnDatabaseIntegrityCheckClicked);
 
@@ -126,8 +115,6 @@ namespace StickyNoteApp
 
             try
             {
-                System.Diagnostics.Debug.WriteLine("=== 付箋復元処理開始 ===");
-
                 using (SqliteDataReader reader = Database.LoadAll())
                 {
                     while (reader.Read())
@@ -138,8 +125,6 @@ namespace StickyNoteApp
                         string content = reader["Content"].ToString();
                         int posX = Convert.ToInt32(reader["PosX"]);
                         int posY = Convert.ToInt32(reader["PosY"]);
-
-                        System.Diagnostics.Debug.WriteLine($"復元中 #{restoredCount}: ID={id}, Text={content}");
 
                         // 付箋フォームを作成
                         StickyNoteForm note = new StickyNoteForm();
@@ -205,24 +190,18 @@ namespace StickyNoteApp
                         note.FormClosed += (s, e) =>
                         {
                             allNotes.Remove(note);
-                            System.Diagnostics.Debug.WriteLine($"付箋削除: 残り{allNotes.Count}件");
                         };
 
                         // 付箋を表示
                         note.Show();
                     }
                 }
-
-                System.Diagnostics.Debug.WriteLine($"=== 付箋復元完了: {restoredCount}件（リマインダー復元: {reminderRestoredCount}件） ===");
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"復元エラー: {ex.Message}");
                 MessageBox.Show($"付箋の復元中にエラー:\n{ex.Message}", "エラー");
             }
         }
-
-
 
         /// <summary>
         /// 新しい付箋を作成
@@ -242,12 +221,9 @@ namespace StickyNoteApp
             note.FormClosed += (s, ev) =>
             {
                 allNotes.Remove(note);
-                System.Diagnostics.Debug.WriteLine($"付箋削除: 残り{allNotes.Count}件");
             };
 
             note.Show();
-
-            System.Diagnostics.Debug.WriteLine($"新しい付箋作成: ID={note.NoteId}");
         }
 
         /// <summary>
@@ -267,7 +243,6 @@ namespace StickyNoteApp
                 }
                 allNotesVisible = false;
                 ToggleAllNotesMenuItem.Text = "すべての付箋を表示";
-                System.Diagnostics.Debug.WriteLine($"すべての付箋を非表示にしました ({allNotes.Count}件)");
             }
             else
             {
@@ -278,7 +253,6 @@ namespace StickyNoteApp
                 }
                 allNotesVisible = true;
                 ToggleAllNotesMenuItem.Text = "すべての付箋を非表示";
-                System.Diagnostics.Debug.WriteLine($"すべての付箋を表示しました ({allNotes.Count}件)");
             }
         }
 
@@ -287,8 +261,6 @@ namespace StickyNoteApp
         /// </summary>
         private void OnCaptureTestClicked(object sender, EventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine("画面キャプチャテスト開始");
-
             try
             {
                 // オーバーレイフォームを作成
@@ -297,7 +269,6 @@ namespace StickyNoteApp
                 // キャプチャ完了イベントを登録
                 overlay.CaptureCompleted += (s, args) =>
                 {
-                    System.Diagnostics.Debug.WriteLine($"キャプチャ完了: {args.CapturedImage.Width}x{args.CapturedImage.Height}");
                     // テスト用：キャプチャした画像を表示
                     ShowCapturedImageTest(args.CapturedImage);
                 };
@@ -307,7 +278,6 @@ namespace StickyNoteApp
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"キャプチャテストエラー: {ex.Message}");
                 MessageBox.Show($"キャプチャテストエラー:\n{ex.Message}", "エラー",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
@@ -370,8 +340,6 @@ namespace StickyNoteApp
                         image.Save(saveDialog.FileName, System.Drawing.Imaging.ImageFormat.Png);
                         MessageBox.Show($"画像を保存しました:\n{saveDialog.FileName}", "保存完了",
                             MessageBoxButtons.OK, MessageBoxIcon.Information);
-
-                        System.Diagnostics.Debug.WriteLine($"画像保存完了: {saveDialog.FileName}");
                     }
                 }
             }
@@ -379,7 +347,6 @@ namespace StickyNoteApp
             {
                 MessageBox.Show($"画像の保存に失敗しました:\n{ex.Message}", "エラー",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
-                System.Diagnostics.Debug.WriteLine($"画像保存エラー: {ex.Message}");
             }
         }
 
@@ -388,8 +355,6 @@ namespace StickyNoteApp
         /// </summary>
         private void OnDatabaseIntegrityCheckClicked(object sender, EventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine("データベース整合性チェック開始");
-
             try
             {
                 // 確認ダイアログを表示
@@ -423,7 +388,6 @@ namespace StickyNoteApp
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"整合性チェックエラー: {ex.Message}");
                 MessageBox.Show(
                     $"整合性チェック中にエラーが発生しました:\n\n{ex.Message}",
                     "エラー",
@@ -439,7 +403,6 @@ namespace StickyNoteApp
         private void OnSettingClicked(object sender, EventArgs e)
         {
             MessageBox.Show("設定画面は準備中です。", "設定", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            System.Diagnostics.Debug.WriteLine("設定メニューがクリックされました");
         }
 
         /// <summary>
@@ -447,7 +410,6 @@ namespace StickyNoteApp
         /// </summary>
         private void OnExitClicked(object sender, EventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine("アプリケーション終了");
             TrayIcon.Visible = false;
             Application.Exit();
         }
@@ -458,24 +420,18 @@ namespace StickyNoteApp
         protected override void OnShown(EventArgs e)
         {
             base.OnShown(e);
-            System.Diagnostics.Debug.WriteLine("OnShown: フォームを非表示にします");
 
             // ホットキーを登録
             if (HotkeyManager.RegisterHotkeys(this.Handle))
             {
-                System.Diagnostics.Debug.WriteLine("ホットキー登録成功");
                 TrayIcon.ShowBalloonTip(TRAY_BALLOON_TIP_DURATION, "付箋アプリ", "ショートカットキー:\nCtrl+Shift+N: 新しい付箋\nCtrl+Shift+H: 付箋の表示/非表示", ToolTipIcon.Info);
-            }
-            else
-            {
-                System.Diagnostics.Debug.WriteLine("ホットキー登録失敗");
             }
 
             this.Hide(); // フォームを非表示にする
         }
 
         /// <summary>
-        /// Windowsメッセージを処理（ホットキー用） 不要？なためコメントアウト
+        /// Windowsメッセージを処理（ホットキー用） 不要？なためコメントアウト ショートカットキー実装時に確認
         /// </summary>
         //protected override void WndProc(ref Message m)
         //{
@@ -501,7 +457,6 @@ namespace StickyNoteApp
             if (HotkeyManager != null)
             {
                 HotkeyManager.UnregisterHotkeys();
-                System.Diagnostics.Debug.WriteLine("ホットキー解除完了");
             }
         }
     }

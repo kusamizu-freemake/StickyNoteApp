@@ -62,19 +62,7 @@ namespace StickyNoteApp
             // 親フォームを保存
             this.parentForm = parent;
 
-            System.Diagnostics.Debug.WriteLine($"[ReminderManager] ctor Hash={this.GetHashCode()} Thread={Thread.CurrentThread.ManagedThreadId}");
             Interlocked.Increment(ref instanceCount); // インスタンス数をインクリメント
-            System.Diagnostics.Debug.WriteLine($"[ReminderManager] instanceCount={instanceCount}");
-        }
-
-        /// <summary>
-        /// ファイナライザ（GCで回収された場合のログ）
-        /// </summary>
-        ~ReminderManager()
-        {
-            System.Diagnostics.Debug.WriteLine($"[ReminderManager] Finalizer Hash={this.GetHashCode()} Thread={Thread.CurrentThread.ManagedThreadId}");
-            try { Interlocked.Decrement(ref instanceCount); } catch { }
-            System.Diagnostics.Debug.WriteLine($"[ReminderManager] instanceCount(after finalizer)={instanceCount}");
         }
 
         /// <summary>
@@ -99,7 +87,6 @@ namespace StickyNoteApp
                 // 過去の時刻は無視
                 if (reminderTime <= DateTime.Now)
                 {
-                    System.Diagnostics.Debug.WriteLine($"[{noteId}] リマインダー時刻が過去のためスキップ: {reminderTime:yyyy-MM-dd HH:mm:ss}");
                     return;
                 }
 
@@ -121,13 +108,10 @@ namespace StickyNoteApp
                 reminderTimer.Interval = TIMER_INTERVAL_MS;
                 reminderTimer.Tick += ReminderTimer_Tick;
                 reminderTimer.Start();
-
-                TimeSpan timeLeft = reminderTime - DateTime.Now;
-                System.Diagnostics.Debug.WriteLine($"[{noteId}] リマインダー復元: {reminderTime:HH:mm:ss} (残り{timeLeft.TotalMinutes:F1}分) Thread={Thread.CurrentThread.ManagedThreadId}");
             }
-            catch (Exception ex)
+            catch
             {
-                System.Diagnostics.Debug.WriteLine($"[{noteId}] リマインダー復元エラー: {ex.Message}");
+                // リマインダー復失敗時は無視（付箋自体は使用可能）
             }
         }
 
@@ -152,7 +136,6 @@ namespace StickyNoteApp
                 catch
                 {
                     // カラムが存在しない場合は復元不要
-                    System.Diagnostics.Debug.WriteLine($"[{noteId}] リマインダーカラムが存在しません");
                     return false;
                 }
 
@@ -186,27 +169,19 @@ namespace StickyNoteApp
                 // 未来の時刻のみ復元
                 if (reminderTime <= DateTime.Now)
                 {
-                    System.Diagnostics.Debug.WriteLine($"[{noteId}] リマインダー時刻が過去のため無効化: {reminderTime:yyyy-MM-dd HH:mm:ss}");
                     return false;
                 }
 
                 // リマインダーを復元
                 RestoreReminder(noteId, content, reminderTime);
 
-                TimeSpan timeLeft = reminderTime - DateTime.Now;
-                System.Diagnostics.Debug.WriteLine(
-                    $"[{noteId}] リマインダー復元成功: {reminderTime:yyyy-MM-dd HH:mm:ss} (残り{timeLeft.TotalMinutes:F1}分)"
-                );
-
                 return true;
             }
-            catch (Exception ex)
+            catch
             {
-                System.Diagnostics.Debug.WriteLine($"[{noteId}] リマインダー復元エラー: {ex.Message}");
                 return false;
             }
         }
-
 
         /// <summary>
         /// リマインダーを設定
@@ -253,12 +228,9 @@ namespace StickyNoteApp
 
                 // 状態変更完了時に保存処理を呼ぶ
                 SaveReminderState();
-
-                System.Diagnostics.Debug.WriteLine($"[{noteId}] リマインダー設定: {minutes}分後 ({reminderTime:HH:mm:ss}) Thread={Thread.CurrentThread.ManagedThreadId}");
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[{noteId}] リマインダー設定エラー: {ex.Message}");
                 MessageBox.Show($"リマインダーの設定に失敗しました。\n\n{ex.Message}", "エラー",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
                 throw;
@@ -284,12 +256,10 @@ namespace StickyNoteApp
 
                 // 状態変更完了時に保存処理を呼ぶ
                 SaveReminderState();
-
-                System.Diagnostics.Debug.WriteLine($"[{noteId}] リマインダーキャンセル Thread={Thread.CurrentThread.ManagedThreadId}");
             }
-            catch (Exception ex)
+            catch
             {
-                System.Diagnostics.Debug.WriteLine($"[{noteId}] リマインダーキャンセルエラー: {ex.Message}");
+                // キャンセル失敗は無視（既に停止している可能性）
             }
         }
 
@@ -300,13 +270,8 @@ namespace StickyNoteApp
         {
             try
             {
-                System.Diagnostics.Debug.WriteLine($"[{noteId}] ReminderTimer_Tick Thread={Thread.CurrentThread.ManagedThreadId}");
-
                 if (DateTime.Now >= reminderTime)
                 {
-                    // リマインダー時刻に到達
-                    System.Diagnostics.Debug.WriteLine($"[{noteId}] リマインダー発火");
-
                     // タイマー停止
                     reminderTimer.Stop();
                     reminderTimer.Tick -= ReminderTimer_Tick; // イベント解除
@@ -323,9 +288,8 @@ namespace StickyNoteApp
                     ShowNotification();
                 }
             }
-            catch (Exception ex)
+            catch
             {
-                System.Diagnostics.Debug.WriteLine($"[{noteId}] リマインダータイマーエラー: {ex.Message}");
                 // タイマーエラーが発生した場合は停止
                 try
                 {
@@ -353,19 +317,16 @@ namespace StickyNoteApp
             {
                 if (parentForm == null)
                 {
-                    System.Diagnostics.Debug.WriteLine($"[{noteId}] SaveReminderState: 親フォームが未設定");
                     return;
                 }
 
                 // 親フォームに付箋の保存を依頼
                 // 親フォーム側で現在の付箋の全情報をDatabase.SaveOrUpdate()に渡す
                 parentForm.SaveCurrentNoteState();
-
-                System.Diagnostics.Debug.WriteLine($"[{noteId}] リマインダー状態を保存 (IsActive={isActive})");
             }
-            catch (Exception ex)
+            catch
             {
-                System.Diagnostics.Debug.WriteLine($"[{noteId}] リマインダー状態保存エラー: {ex.Message}");
+                // 保存失敗は無視（リマインダー機能は継続）
             }
         }
 
@@ -376,20 +337,16 @@ namespace StickyNoteApp
         {
             try
             {
-                System.Diagnostics.Debug.WriteLine($"[{noteId}] ShowNotification Thread={Thread.CurrentThread.ManagedThreadId}");
-
                 MessageBox.Show(
                     $"リマインダー通知\n\n{noteContent}",
                     "付箋リマインダー",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information
                 );
-
-                System.Diagnostics.Debug.WriteLine($"[{noteId}] ShowNotification完了");
             }
-            catch (Exception ex)
+            catch
             {
-                System.Diagnostics.Debug.WriteLine($"[{noteId}] 通知表示エラー: {ex.Message}");
+                // 通知表示失敗は無視
             }
         }
 
@@ -400,7 +357,6 @@ namespace StickyNoteApp
         {
             try
             {
-                System.Diagnostics.Debug.WriteLine($"[{noteId}] Dispose called Hash={this.GetHashCode()} Thread={Thread.CurrentThread.ManagedThreadId}");
                 if (reminderTimer != null)
                 {
                     reminderTimer.Stop();
@@ -411,15 +367,12 @@ namespace StickyNoteApp
                 isActive = false;
 
                 try { Interlocked.Decrement(ref instanceCount); } catch { }
-                System.Diagnostics.Debug.WriteLine($"[ReminderManager] instanceCount(after Dispose)={instanceCount}");
             }
-            catch (Exception ex)
+            catch
             {
-                System.Diagnostics.Debug.WriteLine($"[{noteId}] Disposeエラー: {ex.Message}");
+                // Dispose失敗は無視
             }
         }
-
-        // --- 以下は既存のダイアログ / ヘルパーコード （省略しない）---
 
         /// <summary>
         /// カスタム時間設定ダイアログを表示してリマインダーを設定
@@ -450,11 +403,9 @@ namespace StickyNoteApp
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[{noteId}] カスタムリマインダーダイアログエラー: {ex.Message}");
                 MessageBox.Show($"ダイアログの表示に失敗しました。\n\n{ex.Message}", "エラー",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
-
         }
 
         /// <summary>
@@ -506,7 +457,6 @@ namespace StickyNoteApp
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[{noteId}] リマインダー確認表示エラー: {ex.Message}");
                 MessageBox.Show($"リマインダーの設定に失敗しました。\n\n{ex.Message}", "エラー",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
@@ -531,9 +481,7 @@ namespace StickyNoteApp
                         MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
             }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[{noteId}] キャンセルダイアログエラー: {ex.Message}");
+            catch (Exception ex)           {
                 MessageBox.Show($"リマインダーのキャンセルに失敗しました。\n\n{ex.Message}", "エラー",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }

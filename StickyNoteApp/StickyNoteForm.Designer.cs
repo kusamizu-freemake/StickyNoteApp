@@ -87,7 +87,7 @@ namespace StickyNoteApp
             this.btnClose.TabStop = false;
             this.btnClose.Cursor = System.Windows.Forms.Cursors.Hand;
             this.btnClose.Margin = new Padding(0);
-            this.btnClose.Click += new System.EventHandler(this.btnClose_Click);
+            this.btnClose.Click += new System.EventHandler(this.Button_Close_Click);
 
             // ------- テキストボックス -------
             this.txtNote.Multiline = true;
@@ -119,7 +119,7 @@ namespace StickyNoteApp
             this.topMostMenuItem.Text = "最前面に表示";
             this.topMostMenuItem.CheckOnClick = true;
             this.topMostMenuItem.Checked = false; // ← デフォルトをfalseに変更
-            this.topMostMenuItem.Click += new System.EventHandler(this.topMostMenuItem_Click);
+            this.topMostMenuItem.Click += new System.EventHandler(this.StickyNoteMenu_TopMost_Click);
 
             // 色の変更（サブメニュー）
             this.colorMenuItem.Text = "色の変更";
@@ -134,30 +134,30 @@ namespace StickyNoteApp
 
             // 各色のメニュー項目
             this.colorYellowMenuItem.Text = "イエロー";
-            this.colorYellowMenuItem.Click += new System.EventHandler(this.colorYellowMenuItem_Click);
+            this.colorYellowMenuItem.Click += new System.EventHandler(this.SelectColor_Yellow_Click);
 
             this.colorPinkMenuItem.Text = "ピンク";
-            this.colorPinkMenuItem.Click += new System.EventHandler(this.colorPinkMenuItem_Click);
+            this.colorPinkMenuItem.Click += new System.EventHandler(this.SelectColor_Pink_Click);
 
             this.colorBlueMenuItem.Text = "ブルー";
-            this.colorBlueMenuItem.Click += new System.EventHandler(this.colorBlueMenuItem_Click);
+            this.colorBlueMenuItem.Click += new System.EventHandler(this.SelectColor_Blue_Click);
 
             this.colorGreenMenuItem.Text = "グリーン";
-            this.colorGreenMenuItem.Click += new System.EventHandler(this.colorGreenMenuItem_Click);
+            this.colorGreenMenuItem.Click += new System.EventHandler(this.SelectColor_Green_Click);
 
             this.colorOrangeMenuItem.Text = "オレンジ";
-            this.colorOrangeMenuItem.Click += new System.EventHandler(this.colorOrangeMenuItem_Click);
+            this.colorOrangeMenuItem.Click += new System.EventHandler(this.SelectColor_Orange_Click);
 
             this.colorPurpleMenuItem.Text = "パープル";
-            this.colorPurpleMenuItem.Click += new System.EventHandler(this.colorPurpleMenuItem_Click);
+            this.colorPurpleMenuItem.Click += new System.EventHandler(this.SelectColor_Purple_Click);
 
             // 画面キャプチャ
             this.captureMenuItem.Text = "画面キャプチャ";
-            this.captureMenuItem.Click += new System.EventHandler(this.captureMenuItem_Click);
+            this.captureMenuItem.Click += new System.EventHandler(this.CaptureMenuItem_Click);
 
             // クリップボードから画像を貼り付け
             this.pasteImageMenuItem.Text = "クリップボードから画像を貼り付け";
-            this.pasteImageMenuItem.Click += new System.EventHandler(this.pasteImageMenuItem_Click);
+            this.pasteImageMenuItem.Click += new System.EventHandler(this.PasteImageMenuItem_Click);
 
             // リマインダー（サブメニュー）
             this.reminderMenuItem.Text = "リマインダー";
@@ -172,26 +172,26 @@ namespace StickyNoteApp
 
             // リマインダーの各メニュー項目
             this.reminder5MinMenuItem.Text = "時間を指定...";
-            this.reminder5MinMenuItem.Click += new System.EventHandler(this.reminderCustomMenuItem_Click);
+            this.reminder5MinMenuItem.Click += new System.EventHandler(this.ReminderCustomMenuItem_Click);
 
             this.reminder10MinMenuItem.Text = "10分後";
-            this.reminder10MinMenuItem.Click += new System.EventHandler(this.reminder10MinMenuItem_Click);
+            this.reminder10MinMenuItem.Click += new System.EventHandler(this.Reminder10MinMenuItem_Click);
 
             this.reminder30MinMenuItem.Text = "30分後";
-            this.reminder30MinMenuItem.Click += new System.EventHandler(this.reminder30MinMenuItem_Click);
+            this.reminder30MinMenuItem.Click += new System.EventHandler(this.Reminder30MinMenuItem_Click);
 
             this.reminder60MinMenuItem.Text = "60分後";
-            this.reminder60MinMenuItem.Click += new System.EventHandler(this.reminder60MinMenuItem_Click);
+            this.reminder60MinMenuItem.Click += new System.EventHandler(this.Reminder60MinMenuItem_Click);
 
             this.reminderCancelMenuItem.Text = "リマインダーをキャンセル";
-            this.reminderCancelMenuItem.Click += new System.EventHandler(this.reminderCancelMenuItem_Click);
+            this.reminderCancelMenuItem.Click += new System.EventHandler(this.ReminderCancelMenuItem_Click);
 
             // 区切り線
             this.separatorMenuItem1.Name = "separatorMenuItem1";
 
             // 削除
             this.deleteMenuItem.Text = "削除";
-            this.deleteMenuItem.Click += new System.EventHandler(this.deleteMenuItem_Click);
+            this.deleteMenuItem.Click += new System.EventHandler(this.StickyNoteMenu_Delete_Click);
 
             // ------- コントロール追加 -------
             this.titleBar.Controls.Add(this.btnClose);

@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Diagnostics;
 using System.Drawing;
 using System.Windows.Forms;
 
@@ -37,12 +36,10 @@ namespace StickyNoteApp
         private const int REMINDER_TIME_30MIN = 30; // 30分
         private const int REMINDER_TIME_60MIN = 60; // 60分
 
-
         // ドラッグ移動用の変数
         private bool dragging = false;
         private Point dragStart;
 
-        
         // 復元中フラグ
         private bool isRestoring = false;
 
@@ -69,6 +66,7 @@ namespace StickyNoteApp
 
         // 付箋ID
         public string NoteId { get; set; } = Guid.NewGuid().ToString();
+
         // 作成日時
         public string CreatedAt { get; set; } = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
 
@@ -94,27 +92,19 @@ namespace StickyNoteApp
 
             // 最前面表示の初期状態を反映
             UpdateTopMostMenuState();
-
-            System.Diagnostics.Debug.WriteLine($"付箋作成: ID={NoteId}");
         }
-
 
         /// <summary>
         /// 付箋内容変更検知用のイベントハンドラーの初期化
         /// </summary>
         private void InitializeEventHandlers()
         {
-
-            // Leaveの代わりにDeactivateを使用
             // フォームが非アクティブになった時に保存
             this.Deactivate += StickyNoteForm_Deactivate;
-
-            // 位置・サイズ変更は操作完了時に保存（ドラッグ/リサイズ終了時）
-            // LocationChanged/SizeChangedイベントは登録しない
-
             // 背景色変更時：色変更操作完了時に保存
             this.BackColorChanged += BackColor_Changed;
         }
+
         /// <summary>
         /// 付箋ウィンドウが非アクティブ（フォーカスを失った）になったときに呼ばれる処理。
         /// 復元処理中でなければ、現在の付箋の状態を保存する。
@@ -122,21 +112,17 @@ namespace StickyNoteApp
         /// </summary>
         private void StickyNoteForm_Deactivate(object sender, EventArgs e)
         {
-
             // 復元中は保存しない
             if (isRestoring) return;
 
             SaveCurrentNoteState();
-            System.Diagnostics.Debug.WriteLine($"[{NoteId}] フォーカス喪失→保存");
 
             // TopMostが無効な場合、付箋を前面に戻す
             if (!this.TopMost)
             {
                 this.BringToFront();
-                System.Diagnostics.Debug.WriteLine($"[{NoteId}] フォーカス喪失後に前面表示");
             }
         }
-
 
         /// <summary>
         /// 背景色変更時の処理
@@ -148,7 +134,6 @@ namespace StickyNoteApp
 
             // 色変更完了時に保存
             SaveCurrentNoteState();
-            System.Diagnostics.Debug.WriteLine($"[{NoteId}] 背景色変更→保存");
         }
 
         /// <summary>
@@ -236,8 +221,6 @@ namespace StickyNoteApp
                 // テキスト選択を再有効化
                 this.txtNote.Focus();
                 this.txtNote.Cursor = Cursors.IBeam;
-
-                System.Diagnostics.Debug.WriteLine($"[{NoteId}] サイズ変更終了→保存: {this.Width}x{this.Height}");
             }
         }
 
@@ -319,8 +302,6 @@ namespace StickyNoteApp
 
                 // サイズ変更完了時に保存
                 SaveCurrentNoteState();
-
-                System.Diagnostics.Debug.WriteLine($"[{NoteId}] サイズ変更終了→保存: {this.Width}x{this.Height}");
             }
         }
 
@@ -494,7 +475,6 @@ namespace StickyNoteApp
             {
                 this.TopMost = true;
                 this.Activate();
-                System.Diagnostics.Debug.WriteLine($"[{NoteId}] リマインダー通知表示");
             };
         }
 
@@ -506,7 +486,6 @@ namespace StickyNoteApp
         {
             try
             {
-
                 // 現在の付箋情報をすべてDatabase.SaveOrUpdate()に渡す
                 Database.SaveOrUpdate(this);
 
@@ -514,14 +493,10 @@ namespace StickyNoteApp
                     (txtNote.Text.Length > PREVIEW_TEXT_MAX_LENGTH ?
                      txtNote.Text.Substring(0, PREVIEW_TEXT_MAX_LENGTH) + "..." :
                      txtNote.Text);
-
-                System.Diagnostics.Debug.WriteLine($"✓ 保存成功 [{NoteId}]: '{preview}' at ({Left},{Top}) size ({Width}x{Height})");
             }
-            catch (Exception ex)
+            catch
             {
-                System.Diagnostics.Debug.WriteLine($"✗ 保存エラー [{NoteId}]: {ex.Message}");
-                // エラーメッセージは表示しない（連続保存でダイアログが出続けるのを防ぐ）
-                //MessageBox.Show($"保存エラー:\n{ex.Message}", "エラー");
+                // 連続保存時にエラーダイアログが出続けるのを防ぐため、エラーは無視
             }
         }
 
@@ -554,7 +529,6 @@ namespace StickyNoteApp
             if (reminderManager != null && reminderTime > DateTime.Now)
             {
                 reminderManager.RestoreReminder(NoteId, txtNote.Text, reminderTime);
-                System.Diagnostics.Debug.WriteLine($"[{NoteId}] リマインダー復元完了: {reminderTime:yyyy-MM-dd HH:mm:ss}");
             }
         }
 
@@ -582,7 +556,7 @@ namespace StickyNoteApp
             imageContextMenu.Items.Add(deleteImageItem);
 
             var replaceImageItem = new ToolStripMenuItem("画像を置き換え");
-            replaceImageItem.Click += (s, e) => captureMenuItem_Click(s, e);
+            replaceImageItem.Click += (s, e) => CaptureMenuItem_Click(s, e);
             imageContextMenu.Items.Add(replaceImageItem);
 
             imageContextMenu.Items.Add(new ToolStripSeparator());
@@ -635,7 +609,6 @@ namespace StickyNoteApp
                 try
                 {
                     Clipboard.SetImage(pictureBox.Image);
-                    System.Diagnostics.Debug.WriteLine($"[{NoteId}] 画像をクリップボードにコピー");
                 }
                 catch (Exception ex)
                 {
@@ -703,8 +676,6 @@ namespace StickyNoteApp
 
                 // 画像サイズ変更完了時に保存
                 SaveCurrentNoteState();
-
-                System.Diagnostics.Debug.WriteLine($"[{NoteId}] 画像サイズ変更→保存: {height}px");
             }
         }
 
@@ -746,11 +717,10 @@ namespace StickyNoteApp
                 try
                 {
                     System.IO.File.Delete(capturedImagePath);
-                    System.Diagnostics.Debug.WriteLine($"[{NoteId}] 画像ファイル削除: {capturedImagePath}");
                 }
-                catch (Exception ex)
+                catch
                 {
-                    System.Diagnostics.Debug.WriteLine($"[{NoteId}] 画像ファイル削除エラー: {ex.Message}");
+                    // ファイル削除失敗はユーザー操作に影響しないため無視
                 }
             }
 
@@ -760,8 +730,6 @@ namespace StickyNoteApp
 
             // 画像削除完了時に保存
             SaveCurrentNoteState();
-
-            System.Diagnostics.Debug.WriteLine($"[{NoteId}] 画像削除→保存");
         }
 
         /// <summary>
@@ -798,19 +766,16 @@ namespace StickyNoteApp
 
                 // ドラッグ移動完了時に保存
                 SaveCurrentNoteState();
-
-                System.Diagnostics.Debug.WriteLine($"[{NoteId}] ドラッグ終了→保存");
             }
         }
 
         /// <summary>
         /// 閉じるボタンクリック時の処理
         /// </summary>
-        private void btnClose_Click(object sender, EventArgs e)
+        private void Button_Close_Click(object sender, EventArgs e)
         {
             if (MessageBox.Show("この付箋を削除しますか？", "確認", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
             {
-                System.Diagnostics.Debug.WriteLine($"[{NoteId}] 削除実行");
                 Database.SoftDelete(NoteId);
                 this.Close();
             }
@@ -825,20 +790,17 @@ namespace StickyNoteApp
             // 現在の付箋の近くに表示
             newNote.Location = new Point(this.Left + NEW_NOTE_OFFSET_X, this.Top + NEW_NOTE_OFFSET_Y);
             newNote.Show();
-            System.Diagnostics.Debug.WriteLine($"右クリックから新しい付箋作成: ID={newNote.NoteId}");
         }
 
         /// <summary>
         /// 右クリックメニュー：最前面表示の切り替え
         /// </summary>
-        private void topMostMenuItem_Click(object sender, EventArgs e)
+        private void StickyNoteMenu_TopMost_Click(object sender, EventArgs e)
         {
             this.TopMost = topMostMenuItem.Checked;
 
             // 最前面表示切り替え完了時に保存
             SaveCurrentNoteState();
-
-            System.Diagnostics.Debug.WriteLine($"[{NoteId}] 最前面表示切り替え→保存: {this.TopMost}");
         }
 
         /// <summary>
@@ -855,11 +817,10 @@ namespace StickyNoteApp
         /// <summary>
         /// 右クリックメニュー：付箋削除処理
         /// </summary>
-        private void deleteMenuItem_Click(object sender, EventArgs e)
+        private void StickyNoteMenu_Delete_Click(object sender, EventArgs e)
         {
             if (MessageBox.Show("この付箋を削除しますか？", "確認", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
             {
-                System.Diagnostics.Debug.WriteLine($"[{NoteId}] 削除実行");
                 Database.SoftDelete(NoteId);
                 this.Close();
             }
@@ -883,14 +844,12 @@ namespace StickyNoteApp
 
             // 色変更完了時に保存
             SaveCurrentNoteState();
-
-            System.Diagnostics.Debug.WriteLine($"[{NoteId}] 色変更→保存: {color.Name}");
         }
 
         /// <summary>
         /// 色メニュー：イエロー
         /// </summary>
-        private void colorYellowMenuItem_Click(object sender, EventArgs e)
+        private void SelectColor_Yellow_Click(object sender, EventArgs e)
         {
             ChangeColor(Color.Khaki);
         }
@@ -898,7 +857,7 @@ namespace StickyNoteApp
         /// <summary>
         /// 色メニュー：ピンク
         /// </summary>
-        private void colorPinkMenuItem_Click(object sender, EventArgs e)
+        private void SelectColor_Pink_Click(object sender, EventArgs e)
         {
             ChangeColor(Color.LightPink);
         }
@@ -906,7 +865,7 @@ namespace StickyNoteApp
         /// <summary>
         /// 色メニュー：ブルー
         /// </summary>
-        private void colorBlueMenuItem_Click(object sender, EventArgs e)
+        private void SelectColor_Blue_Click(object sender, EventArgs e)
         {
             ChangeColor(Color.LightBlue);
         }
@@ -914,7 +873,7 @@ namespace StickyNoteApp
         /// <summary>
         /// 色メニュー：グリーン
         /// </summary>
-        private void colorGreenMenuItem_Click(object sender, EventArgs e)
+        private void SelectColor_Green_Click(object sender, EventArgs e)
         {
             ChangeColor(Color.LightGreen);
         }
@@ -922,7 +881,7 @@ namespace StickyNoteApp
         /// <summary>
         /// 色メニュー：オレンジ
         /// </summary>
-        private void colorOrangeMenuItem_Click(object sender, EventArgs e)
+        private void SelectColor_Orange_Click(object sender, EventArgs e)
         {
             ChangeColor(Color.LightSalmon);
         }
@@ -930,7 +889,7 @@ namespace StickyNoteApp
         /// <summary>
         /// 色メニュー：パープル
         /// </summary>
-        private void colorPurpleMenuItem_Click(object sender, EventArgs e)
+        private void SelectColor_Purple_Click(object sender, EventArgs e)
         {
             ChangeColor(Color.Plum);
         }
@@ -938,10 +897,8 @@ namespace StickyNoteApp
         /// <summary>
         /// 画面キャプチャメニュー
         /// </summary>
-        private void captureMenuItem_Click(object sender, EventArgs e)
+        private void CaptureMenuItem_Click(object sender, EventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine($"[{NoteId}] 画面キャプチャ開始");
-
             try
             {
                 // オーバーレイフォームを表示
@@ -951,7 +908,6 @@ namespace StickyNoteApp
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[{NoteId}] キャプチャエラー: {ex.Message}");
                 MessageBox.Show($"画面キャプチャに失敗しました:\n{ex.Message}", "エラー",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
@@ -960,10 +916,8 @@ namespace StickyNoteApp
         /// <summary>
         /// クリップボードから画像を貼り付け
         /// </summary>
-        private void pasteImageMenuItem_Click(object sender, EventArgs e)
+        private void PasteImageMenuItem_Click(object sender, EventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine($"[{NoteId}] クリップボードから画像を貼り付け");
-
             try
             {
                 if (Clipboard.ContainsImage())
@@ -999,8 +953,6 @@ namespace StickyNoteApp
 
                         // 画像貼り付け完了時に保存
                         SaveCurrentNoteState();
-
-                        System.Diagnostics.Debug.WriteLine($"[{NoteId}] クリップボード画像貼り付け→保存: {imagePath}");
                     }
                 }
                 else
@@ -1011,7 +963,6 @@ namespace StickyNoteApp
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[{NoteId}] 貼り付けエラー: {ex.Message}");
                 MessageBox.Show($"画像の貼り付けに失敗しました:\n{ex.Message}", "エラー",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
@@ -1048,12 +999,9 @@ namespace StickyNoteApp
 
                 // 画像キャプチャ完了時に保存
                 SaveCurrentNoteState();
-
-                System.Diagnostics.Debug.WriteLine($"[{NoteId}] 画像キャプチャ→保存: {imagePath}");
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[{NoteId}] 画像保存エラー: {ex.Message}");
                 MessageBox.Show($"画像の保存に失敗しました:\n{ex.Message}", "エラー",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
@@ -1080,8 +1028,6 @@ namespace StickyNoteApp
 
             image.Save(filePath, System.Drawing.Imaging.ImageFormat.Png);
 
-            System.Diagnostics.Debug.WriteLine($"[{NoteId}] 画像保存: {filePath}");
-
             return filePath;
         }
 
@@ -1106,20 +1052,18 @@ namespace StickyNoteApp
                     txtNote.Height = this.ClientSize.Height - txtNote.Top;
 
                     capturedImagePath = imagePath;
-
-                    System.Diagnostics.Debug.WriteLine($"[{NoteId}] 画像復元: {imagePath}");
                 }
             }
-            catch (Exception ex)
+            catch
             {
-                System.Diagnostics.Debug.WriteLine($"[{NoteId}] 画像読み込みエラー: {ex.Message}");
+                // 画像読み込み失敗時は画像なしの状態で続行
             }
         }
 
         /// <summary>
         /// リマインダーメニュー:カスタム時間指定
         /// </summary>
-        private void reminderCustomMenuItem_Click(object sender, EventArgs e)
+        private void ReminderCustomMenuItem_Click(object sender, EventArgs e)
         {
             reminderManager?.ShowCustomReminderDialog(NoteId, txtNote.Text);
         }
@@ -1127,7 +1071,7 @@ namespace StickyNoteApp
         /// <summary>
         /// リマインダーメニュー:10分後
         /// </summary>
-        private void reminder10MinMenuItem_Click(object sender, EventArgs e)
+        private void Reminder10MinMenuItem_Click(object sender, EventArgs e)
         {
             reminderManager?.SetReminderWithConfirmation(NoteId, txtNote.Text, REMINDER_TIME_10MIN);
         }
@@ -1135,7 +1079,7 @@ namespace StickyNoteApp
         /// <summary>
         /// リマインダーメニュー:30分後
         /// </summary>
-        private void reminder30MinMenuItem_Click(object sender, EventArgs e)
+        private void Reminder30MinMenuItem_Click(object sender, EventArgs e)
         {
             reminderManager?.SetReminderWithConfirmation(NoteId, txtNote.Text, REMINDER_TIME_30MIN);
         }
@@ -1143,7 +1087,7 @@ namespace StickyNoteApp
         /// <summary>
         /// リマインダーメニュー:60分後
         /// </summary>
-        private void reminder60MinMenuItem_Click(object sender, EventArgs e)
+        private void Reminder60MinMenuItem_Click(object sender, EventArgs e)
         {
             reminderManager?.SetReminderWithConfirmation(NoteId, txtNote.Text, REMINDER_TIME_60MIN);
         }
@@ -1151,7 +1095,7 @@ namespace StickyNoteApp
         /// <summary>
         /// リマインダーメニュー:キャンセル
         /// </summary>
-        private void reminderCancelMenuItem_Click(object sender, EventArgs e)
+        private void ReminderCancelMenuItem_Click(object sender, EventArgs e)
         {
             reminderManager?.ShowCancelReminderDialog();
         }
@@ -1163,13 +1107,11 @@ namespace StickyNoteApp
         {
             // 復元中フラグを立てる
             isRestoring = true;
-            
+
             txtNote.Text = text;
-            System.Diagnostics.Debug.WriteLine($"[{NoteId}] テキスト設定: {text}");
 
             // 復元中フラグを下ろす
             isRestoring = false;
-
         }
         // 新規メソッド追加
 
@@ -1187,7 +1129,6 @@ namespace StickyNoteApp
         public void EndRestore()
         {
             isRestoring = false;
-            System.Diagnostics.Debug.WriteLine($"[{NoteId}] 復元処理終了");
         }
 
         /// <summary>
@@ -1206,9 +1147,6 @@ namespace StickyNoteApp
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
             base.OnFormClosing(e);
-
-            System.Diagnostics.Debug.WriteLine($"[{NoteId}] フォームクローズ");
-
 
             if (reminderManager != null)
             {
