@@ -27,7 +27,7 @@ namespace StickyNoteApp
         private const int MAX_REMINDER_MINUTES = MAX_REMINDER_HOURS * MINUTES_PER_HOUR; // 設定可能な最大時間（1440分＝24時間ちょうどまでOK）
 
         private const int COLUMN_NOT_FOUND = -1; // カラムが見つからない場合の値
-        private const int REMINDER_ENABLED = 1; // StickyNoteContentChanged
+        private const int REMINDER_ENABLED = 1; // リマインダー有効フラグの値
 
         // Timerの宣言を明示的にSystem.Windows.Forms.Timerに変更
         private System.Windows.Forms.Timer reminderTimer;
