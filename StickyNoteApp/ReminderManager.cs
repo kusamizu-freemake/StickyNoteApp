@@ -481,7 +481,7 @@ namespace StickyNoteApp
                         MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
             }
-            catch            {
+            catch (Exception ex)           {
                 MessageBox.Show($"リマインダーのキャンセルに失敗しました。\n\n{ex.Message}", "エラー",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
