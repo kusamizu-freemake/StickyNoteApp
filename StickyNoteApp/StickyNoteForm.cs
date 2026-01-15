@@ -556,9 +556,6 @@ namespace StickyNoteApp
             imageContextMenu.Items.Add(deleteImageItem);
 
             var replaceImageItem = new ToolStripMenuItem("画像を置き換え");
-            replaceImageItem.Click += (s, e) => CaptureMenuItem_Click(s, e);
-            imageContextMenu.Items.Add(replaceImageItem);
-
             imageContextMenu.Items.Add(new ToolStripSeparator());
 
             var copyImageItem = new ToolStripMenuItem("画像をコピー");
@@ -894,24 +891,6 @@ namespace StickyNoteApp
             ChangeColor(Color.Plum);
         }
 
-        /// <summary>
-        /// 画面キャプチャメニュー
-        /// </summary>
-        private void CaptureMenuItem_Click(object sender, EventArgs e)
-        {
-            try
-            {
-                // オーバーレイフォームを表示
-                var overlay = new ScreenCaptureOverlay();
-                overlay.CaptureCompleted += Overlay_CaptureCompleted;
-                overlay.ShowDialog();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"画面キャプチャに失敗しました:\n{ex.Message}", "エラー",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
 
         /// <summary>
         /// クリップボードから画像を貼り付け
@@ -968,44 +947,6 @@ namespace StickyNoteApp
             }
         }
 
-        /// <summary>
-        /// キャプチャ完了時の処理
-        /// </summary>
-        private void Overlay_CaptureCompleted(object sender, CaptureCompletedEventArgs e)
-        {
-            try
-            {
-                // 画像を保存
-                string imagePath = SaveCapturedImage(e.CapturedImage);
-
-                // PictureBoxに表示
-                if (pictureBox.Image != null)
-                {
-                    pictureBox.Image.Dispose();
-                }
-
-                pictureBox.Image = e.CapturedImage;
-                pictureBox.Height = DEFAULT_IMAGE_HEIGHT;
-                pictureBox.Visible = true;
-
-                // テキストボックスのDockを解除して位置を調整
-                txtNote.Dock = DockStyle.None;
-                txtNote.Top = pictureBox.Bottom;
-                txtNote.Left = IMAGE_LEFT_MARGIN;
-                txtNote.Width = this.ClientSize.Width;
-                txtNote.Height = this.ClientSize.Height - txtNote.Top;
-
-                capturedImagePath = imagePath;
-
-                // 画像キャプチャ完了時に保存
-                SaveCurrentNoteState();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"画像の保存に失敗しました:\n{ex.Message}", "エラー",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
 
         /// <summary>
         /// キャプチャ画像をファイルに保存

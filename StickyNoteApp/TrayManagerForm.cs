@@ -18,12 +18,6 @@ namespace StickyNoteApp
         private const int TRAY_BALLOON_TIP_DURATION = 2000; // トレイアイコンのバルーンチップ表示時間(ミリ秒)
         private const int TRAY_BALLOON_TIP_DURATION_SHORT = 1000; // トレイアイコンのバルーンチップ表示時間(短)(ミリ秒)
 
-        // テストフォームのサイズ設定
-        private const int TEST_FORM_WIDTH = 600; // テストフォームの幅
-        private const int TEST_FORM_HEIGHT = 500; // テストフォームの高さ
-        private const int TEST_FORM_BUTTON_HEIGHT = 40; // テストフォームのボタン高さ
-        private const int TEST_FORM_LABEL_HEIGHT = 30; // テストフォームのラベル高さ
-
         private static NotifyIcon TrayIcon; // タスクトレイアイコン
         private ContextMenuStrip TrayMenu; // トレイメニュー
         private ToolStripMenuItem ToggleAllNotesMenuItem; // すべての付箋表示/非表示メニュー
@@ -72,10 +66,6 @@ namespace StickyNoteApp
             TrayMenu.Items.Add(new ToolStripSeparator()); // 区切り線
             TrayMenu.Items.Add("データベース整合性チェック", null, OnDatabaseIntegrityCheckClicked);
 
-            // 画面キャプチャテスト
-            var captureTestItem = new ToolStripMenuItem("画面キャプチャテスト");
-            captureTestItem.Click += OnCaptureTestClicked;
-            TrayMenu.Items.Add(captureTestItem);
 
             // 設定（未実装）
             TrayMenu.Items.Add("設定", null, OnSettingClicked);
@@ -256,99 +246,6 @@ namespace StickyNoteApp
             }
         }
 
-        /// <summary>
-        /// 画面キャプチャテスト
-        /// </summary>
-        private void OnCaptureTestClicked(object sender, EventArgs e)
-        {
-            try
-            {
-                // オーバーレイフォームを作成
-                var overlay = new ScreenCaptureOverlay();
-
-                // キャプチャ完了イベントを登録
-                overlay.CaptureCompleted += (s, args) =>
-                {
-                    // テスト用：キャプチャした画像を表示
-                    ShowCapturedImageTest(args.CapturedImage);
-                };
-
-                // モーダル表示
-                overlay.ShowDialog();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"キャプチャテストエラー:\n{ex.Message}", "エラー",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
-        /// <summary>
-        /// キャプチャした画像を表示（テスト用）
-        /// </summary>
-        private void ShowCapturedImageTest(Bitmap image)
-        {
-            // テスト用フォームを作成
-            var testForm = new Form();
-            testForm.Text = "キャプチャテスト結果";
-            testForm.Size = new Size(TEST_FORM_WIDTH, TEST_FORM_HEIGHT);
-            testForm.StartPosition = FormStartPosition.CenterScreen;
-
-            var pictureBox = new PictureBox();
-            pictureBox.Dock = DockStyle.Fill;
-            pictureBox.SizeMode = PictureBoxSizeMode.Zoom;
-            pictureBox.Image = image;
-
-            var saveButton = new Button();
-            saveButton.Text = "画像を保存";
-            saveButton.Dock = DockStyle.Bottom;
-            saveButton.Height = TEST_FORM_BUTTON_HEIGHT;
-            saveButton.Click += (s, e) =>
-            {
-                SaveCapturedImageTest(image);
-            };
-
-            var infoLabel = new Label();
-            infoLabel.Text = $"サイズ: {image.Width} × {image.Height}";
-            infoLabel.Dock = DockStyle.Top;
-            infoLabel.Height = TEST_FORM_LABEL_HEIGHT;
-            infoLabel.TextAlign = ContentAlignment.MiddleCenter;
-            infoLabel.BackColor = Color.LightGray;
-
-            testForm.Controls.Add(pictureBox);
-            testForm.Controls.Add(saveButton);
-            testForm.Controls.Add(infoLabel);
-
-            testForm.Show();
-        }
-
-        /// <summary>
-        /// キャプチャ画像を保存（テスト用）
-        /// </summary>
-        private void SaveCapturedImageTest(Bitmap image)
-        {
-            try
-            {
-                using (var saveDialog = new SaveFileDialog())
-                {
-                    saveDialog.Filter = "PNG画像|*.png|JPEG画像|*.jpg|すべてのファイル|*.*";
-                    saveDialog.DefaultExt = "png";
-                    saveDialog.FileName = $"capture_{DateTime.Now:yyyyMMdd_HHmmss}.png";
-
-                    if (saveDialog.ShowDialog() == DialogResult.OK)
-                    {
-                        image.Save(saveDialog.FileName, System.Drawing.Imaging.ImageFormat.Png);
-                        MessageBox.Show($"画像を保存しました:\n{saveDialog.FileName}", "保存完了",
-                            MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"画像の保存に失敗しました:\n{ex.Message}", "エラー",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
 
         /// <summary>
         /// データベース整合性チェック

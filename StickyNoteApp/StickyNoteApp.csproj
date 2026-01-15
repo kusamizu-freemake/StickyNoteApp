@@ -101,9 +101,6 @@
     <Compile Include="ReminderManager.Designer.cs">
       <DependentUpon>ReminderManager.cs</DependentUpon>
     </Compile>
-    <Compile Include="ScreenCaptureOverlay .cs">
-      <SubType>Form</SubType>
-    </Compile>
     <Compile Include="TrayManagerForm.cs">
       <SubType>Form</SubType>
     </Compile>
