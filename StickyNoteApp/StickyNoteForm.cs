@@ -73,12 +73,13 @@ namespace StickyNoteApp
         // リマインダーマネージャー
         private ReminderManager reminderManager;
 
-        // 画面キャプチャ用
+        // 付箋に貼り付けた画像を表示するための PictureBox
         private PictureBox pictureBox;
+        // 付箋に貼り付けた画像ファイルの保存パス
         private string capturedImagePath;
 
         /// <summary>
-        /// キャプチャ画像のパス（データベース保存用）
+        /// 付箋に貼り付けた画像のパス（データベース保存・復元用）
         /// </summary>
         public string CapturedImagePath => capturedImagePath;
 
@@ -533,7 +534,7 @@ namespace StickyNoteApp
         }
 
         /// <summary>
-        /// PictureBoxの初期化 製作中
+        /// 付箋に貼り付けた画像を表示する PictureBox の初期化
         /// </summary>
         private void InitializePictureBox()
         {
@@ -695,7 +696,8 @@ namespace StickyNoteApp
         }
 
         /// <summary>
-        /// キャプチャ画像を削除
+        /// 付箋に貼り付けた画像を削除する
+        /// （表示・ファイル・パス情報をまとめてクリアする）
         /// </summary>
         private void RemoveCapturedImage()
         {
@@ -949,7 +951,7 @@ namespace StickyNoteApp
 
 
         /// <summary>
-        /// キャプチャ画像をファイルに保存
+        /// 付箋に貼り付けた画像をファイルとして保存する
         /// </summary>
         private string SaveCapturedImage(Bitmap image)
         {
@@ -973,7 +975,8 @@ namespace StickyNoteApp
         }
 
         /// <summary>
-        /// キャプチャ画像を復元（データベースから読み込み時用）
+        /// 付箋に貼り付けた画像を復元する
+        /// （データベースから読み込んだパスを元に表示）
         /// </summary>
         public void LoadCapturedImage(string imagePath)
         {
