@@ -73,12 +73,13 @@ namespace StickyNoteApp
         // リマインダーマネージャー
         private ReminderManager reminderManager;
 
-        // 画面キャプチャ用
+        // 付箋に貼り付けた画像を表示するための PictureBox
         private PictureBox pictureBox;
+        // 付箋に貼り付けた画像ファイルの保存パス
         private string capturedImagePath;
 
         /// <summary>
-        /// キャプチャ画像のパス（データベース保存用）
+        /// 付箋に貼り付けた画像のパス（データベース保存・復元用）
         /// </summary>
         public string CapturedImagePath => capturedImagePath;
 
@@ -533,7 +534,7 @@ namespace StickyNoteApp
         }
 
         /// <summary>
-        /// PictureBoxの初期化 製作中
+        /// 付箋に貼り付けた画像を表示する PictureBox の初期化
         /// </summary>
         private void InitializePictureBox()
         {
@@ -556,9 +557,6 @@ namespace StickyNoteApp
             imageContextMenu.Items.Add(deleteImageItem);
 
             var replaceImageItem = new ToolStripMenuItem("画像を置き換え");
-            replaceImageItem.Click += (s, e) => CaptureMenuItem_Click(s, e);
-            imageContextMenu.Items.Add(replaceImageItem);
-
             imageContextMenu.Items.Add(new ToolStripSeparator());
 
             var copyImageItem = new ToolStripMenuItem("画像をコピー");
@@ -698,7 +696,8 @@ namespace StickyNoteApp
         }
 
         /// <summary>
-        /// キャプチャ画像を削除
+        /// 付箋に貼り付けた画像を削除する
+        /// （表示・ファイル・パス情報をまとめてクリアする）
         /// </summary>
         private void RemoveCapturedImage()
         {
@@ -894,24 +893,6 @@ namespace StickyNoteApp
             ChangeColor(Color.Plum);
         }
 
-        /// <summary>
-        /// 画面キャプチャメニュー
-        /// </summary>
-        private void CaptureMenuItem_Click(object sender, EventArgs e)
-        {
-            try
-            {
-                // オーバーレイフォームを表示
-                var overlay = new ScreenCaptureOverlay();
-                overlay.CaptureCompleted += Overlay_CaptureCompleted;
-                overlay.ShowDialog();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"画面キャプチャに失敗しました:\n{ex.Message}", "エラー",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
 
         /// <summary>
         /// クリップボードから画像を貼り付け
@@ -968,47 +949,9 @@ namespace StickyNoteApp
             }
         }
 
-        /// <summary>
-        /// キャプチャ完了時の処理
-        /// </summary>
-        private void Overlay_CaptureCompleted(object sender, CaptureCompletedEventArgs e)
-        {
-            try
-            {
-                // 画像を保存
-                string imagePath = SaveCapturedImage(e.CapturedImage);
-
-                // PictureBoxに表示
-                if (pictureBox.Image != null)
-                {
-                    pictureBox.Image.Dispose();
-                }
-
-                pictureBox.Image = e.CapturedImage;
-                pictureBox.Height = DEFAULT_IMAGE_HEIGHT;
-                pictureBox.Visible = true;
-
-                // テキストボックスのDockを解除して位置を調整
-                txtNote.Dock = DockStyle.None;
-                txtNote.Top = pictureBox.Bottom;
-                txtNote.Left = IMAGE_LEFT_MARGIN;
-                txtNote.Width = this.ClientSize.Width;
-                txtNote.Height = this.ClientSize.Height - txtNote.Top;
-
-                capturedImagePath = imagePath;
-
-                // 画像キャプチャ完了時に保存
-                SaveCurrentNoteState();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"画像の保存に失敗しました:\n{ex.Message}", "エラー",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
 
         /// <summary>
-        /// キャプチャ画像をファイルに保存
+        /// 付箋に貼り付けた画像をファイルとして保存する
         /// </summary>
         private string SaveCapturedImage(Bitmap image)
         {
@@ -1032,7 +975,8 @@ namespace StickyNoteApp
         }
 
         /// <summary>
-        /// キャプチャ画像を復元（データベースから読み込み時用）
+        /// 付箋に貼り付けた画像を復元する
+        /// （データベースから読み込んだパスを元に表示）
         /// </summary>
         public void LoadCapturedImage(string imagePath)
         {

@@ -44,7 +44,6 @@ namespace StickyNoteApp
             this.colorGreenMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.colorOrangeMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.colorPurpleMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.captureMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.pasteImageMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.reminderMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.reminder5MinMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -104,7 +103,6 @@ namespace StickyNoteApp
                 this.newNoteMenuItem,
                 this.topMostMenuItem,
                 this.colorMenuItem,
-                this.captureMenuItem,
                 this.pasteImageMenuItem,
                 this.reminderMenuItem,
                 this.separatorMenuItem1,
@@ -151,9 +149,6 @@ namespace StickyNoteApp
             this.colorPurpleMenuItem.Text = "パープル";
             this.colorPurpleMenuItem.Click += new System.EventHandler(this.SelectColor_Purple_Click);
 
-            // 画面キャプチャ
-            this.captureMenuItem.Text = "画面キャプチャ";
-            this.captureMenuItem.Click += new System.EventHandler(this.CaptureMenuItem_Click);
 
             // クリップボードから画像を貼り付け
             this.pasteImageMenuItem.Text = "クリップボードから画像を貼り付け";
@@ -221,7 +216,6 @@ namespace StickyNoteApp
         private System.Windows.Forms.ToolStripMenuItem colorGreenMenuItem;
         private System.Windows.Forms.ToolStripMenuItem colorOrangeMenuItem;
         private System.Windows.Forms.ToolStripMenuItem colorPurpleMenuItem;
-        private System.Windows.Forms.ToolStripMenuItem captureMenuItem;
         private System.Windows.Forms.ToolStripMenuItem pasteImageMenuItem;
         private System.Windows.Forms.ToolStripMenuItem reminderMenuItem;
         private System.Windows.Forms.ToolStripMenuItem reminder5MinMenuItem;
