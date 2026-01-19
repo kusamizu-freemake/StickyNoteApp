@@ -12,11 +12,11 @@ namespace StickyNoteApp
     public partial class TrayManagerForm : Form
     {
         // 定数定義
-
         private const int CURSOR_OFFSET = 50; // カーソル位置からの付箋作成オフセット
         private const int TOPMOST_FLAG_ENABLED = 1; // TopMostフラグが有効な場合の値
         private const int TRAY_BALLOON_TIP_DURATION = 2000; // トレイアイコンのバルーンチップ表示時間(ミリ秒)
         private const int TRAY_BALLOON_TIP_DURATION_SHORT = 1000; // トレイアイコンのバルーンチップ表示時間(短)(ミリ秒)
+
 
         private static NotifyIcon TrayIcon; // タスクトレイアイコン
         private ContextMenuStrip TrayMenu; // トレイメニュー
@@ -62,6 +62,7 @@ namespace StickyNoteApp
             ToggleAllNotesMenuItem.ShortcutKeyDisplayString = "Ctrl+Shift+H";
             ToggleAllNotesMenuItem.Click += OnShowHideAllStickyNotesClicked;
             TrayMenu.Items.Add(ToggleAllNotesMenuItem);
+
             // DB整合性チェック（デバッグ用。完成間際で削除予定）
             TrayMenu.Items.Add(new ToolStripSeparator()); // 区切り線
             TrayMenu.Items.Add("データベース整合性チェック", null, OnDatabaseIntegrityCheckClicked);
@@ -151,11 +152,21 @@ namespace StickyNoteApp
                             // テキストを最後に復元
                             note.SetText(content);
 
-                            // 画像を復元
+                            // 画像を復元（3つのパスを渡す）
                             string imagePath = reader["ImagePath"]?.ToString();
-                            if (!string.IsNullOrEmpty(imagePath))
+                            string originalImagePath = reader["OriginalImagePath"]?.ToString();
+                            string resizedImagePath = reader["ResizedImagePath"]?.ToString();
+                            int imageDisplayHeight = 0;
+                            if (reader["ImageDisplayHeight"] != DBNull.Value)
                             {
-                                note.LoadCapturedImage(imagePath);
+                                imageDisplayHeight = Convert.ToInt32(reader["ImageDisplayHeight"]);
+                            }
+
+                            if (!string.IsNullOrEmpty(imagePath) ||
+                                !string.IsNullOrEmpty(originalImagePath) ||
+                                !string.IsNullOrEmpty(resizedImagePath))
+                            {
+                                note.LoadCapturedImage(imagePath, originalImagePath, resizedImagePath, imageDisplayHeight);
                             }
 
                             // リマインダー復元（ReminderManagerに委譲）
@@ -245,6 +256,7 @@ namespace StickyNoteApp
                 ToggleAllNotesMenuItem.Text = "すべての付箋を非表示";
             }
         }
+
 
 
         /// <summary>

@@ -84,6 +84,27 @@ namespace StickyNoteApp
                             AddColumn(con, "StickyNotes", "ImagePath", "TEXT");
                         }
 
+                        // 元画像パスのカラム
+                        if (!ColumnExists(con, "StickyNotes", "OriginalImagePath"))
+                        {
+                            System.Diagnostics.Debug.WriteLine("OriginalImagePathカラムを追加します。");
+                            AddColumn(con, "StickyNotes", "OriginalImagePath", "TEXT");
+                        }
+
+                        // リサイズ済み画像パスのカラム
+                        if (!ColumnExists(con, "StickyNotes", "ResizedImagePath"))
+                        {
+                            System.Diagnostics.Debug.WriteLine("ResizedImagePathカラムを追加します。");
+                            AddColumn(con, "StickyNotes", "ResizedImagePath", "TEXT");
+                        }
+
+                        // 画像表示高さのカラム
+                        if (!ColumnExists(con, "StickyNotes", "ImageDisplayHeight"))
+                        {
+                            System.Diagnostics.Debug.WriteLine("ImageDisplayHeightカラムを追加します。");
+                            AddColumn(con, "StickyNotes", "ImageDisplayHeight", "INTEGER DEFAULT 150");
+                        }
+
                         // リマインダー関連カラムを追加
                         if (!ColumnExists(con, "StickyNotes", "ReminderActive"))
                         {
@@ -96,6 +117,9 @@ namespace StickyNoteApp
                             System.Diagnostics.Debug.WriteLine("ReminderTimeカラムを追加します。");
                             AddColumn(con, "StickyNotes", "ReminderTime", "TEXT");
                         }
+
+                        // 既存データの移行処理
+                        MigrateImageData(con);
                     }
                 } //← usingを抜けると自動的にclose
 
@@ -105,6 +129,37 @@ namespace StickyNoteApp
             {
                 System.Diagnostics.Debug.WriteLine($"データベース初期化エラー: {ex.Message}");
                 throw new Exception($"データベース初期化エラー: {ex.Message}", ex);
+            }
+        }
+
+        /// <summary>
+        /// 既存の画像データを新しい構造に移行
+        /// </summary>
+        private static void MigrateImageData(SqliteConnection con)
+        {
+            try
+            {
+                // ImagePathにデータがあり、OriginalImagePathが空のレコードを移行
+                string sql = @"
+                    UPDATE StickyNotes 
+                    SET OriginalImagePath = ImagePath 
+                    WHERE ImagePath IS NOT NULL 
+                      AND ImagePath != '' 
+                      AND (OriginalImagePath IS NULL OR OriginalImagePath = '')";
+
+                using (var cmd = new SqliteCommand(sql, con))
+                {
+                    int count = cmd.ExecuteNonQuery();
+                    if (count > 0)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"画像データを移行しました: {count}件");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"画像データ移行エラー: {ex.Message}");
+                // エラーが発生してもアプリは続行
             }
         }
 
@@ -161,7 +216,7 @@ namespace StickyNoteApp
         }
 
         /// <summary>
-        /// StickyNotesテーブルの作成(リマインダー関連追加)
+        /// StickyNotesテーブルの作成(画像関連追加)
         /// </summary>
         private static void CreateStickyNotesTable(SqliteConnection con)
         {
@@ -179,6 +234,9 @@ namespace StickyNoteApp
                     TopMostFlag INTEGER,
                     DeleteFlag INTEGER DEFAULT 0,
                     ImagePath TEXT,
+                    OriginalImagePath TEXT,
+                    ResizedImagePath TEXT,
+                    ImageDisplayHeight INTEGER DEFAULT 150,
                     ReminderActive INTEGER DEFAULT 0,
                     ReminderTime TEXT,
                     CreatedAt TEXT,
@@ -215,13 +273,15 @@ namespace StickyNoteApp
                     {
                         con.Open();//← 保存処理開始時にopen
 
-                        // UPSERTクエリ(リマインダー関連追加）
+                        // UPSERTクエリ(画像関連追加）
                         string sql = @"
                             INSERT INTO StickyNotes
-                            (Id, Content, PosX, PosY, Width, Height, BgR, BgG, BgB, TopMostFlag, DeleteFlag, ImagePath, 
+                            (Id, Content, PosX, PosY, Width, Height, BgR, BgG, BgB, TopMostFlag, DeleteFlag, 
+                             ImagePath, OriginalImagePath, ResizedImagePath, ImageDisplayHeight,
                              ReminderActive, ReminderTime, CreatedAt, UpdatedAt)
                             VALUES
-                            ($Id, $Content, $PosX, $PosY, $Width, $Height, $BgR, $BgG, $BgB, $TopMostFlag, 0, $ImagePath,
+                            ($Id, $Content, $PosX, $PosY, $Width, $Height, $BgR, $BgG, $BgB, $TopMostFlag, 0, 
+                             $ImagePath, $OriginalImagePath, $ResizedImagePath, $ImageDisplayHeight,
                              $ReminderActive, $ReminderTime, $CreatedAt, $UpdatedAt)
                             ON CONFLICT(Id) DO UPDATE SET
                                 Content = excluded.Content,
@@ -234,6 +294,9 @@ namespace StickyNoteApp
                                 BgB = excluded.BgB,
                                 TopMostFlag = excluded.TopMostFlag,
                                 ImagePath = excluded.ImagePath,
+                                OriginalImagePath = excluded.OriginalImagePath,
+                                ResizedImagePath = excluded.ResizedImagePath,
+                                ImageDisplayHeight = excluded.ImageDisplayHeight,
                                 ReminderActive = excluded.ReminderActive,
                                 ReminderTime = excluded.ReminderTime,
                                 UpdatedAt = excluded.UpdatedAt;
@@ -252,7 +315,12 @@ namespace StickyNoteApp
                             cmd.Parameters.AddWithValue("$BgG", note.BackColor.G);
                             cmd.Parameters.AddWithValue("$BgB", note.BackColor.B);
                             cmd.Parameters.AddWithValue("$TopMostFlag", note.TopMost ? 1 : 0);
+
+                            // 画像関連パラメータ
                             cmd.Parameters.AddWithValue("$ImagePath", string.IsNullOrEmpty(note.CapturedImagePath) ? "" : note.CapturedImagePath);
+                            cmd.Parameters.AddWithValue("$OriginalImagePath", string.IsNullOrEmpty(note.OriginalImagePath) ? "" : note.OriginalImagePath);
+                            cmd.Parameters.AddWithValue("$ResizedImagePath", string.IsNullOrEmpty(note.ResizedImagePath) ? "" : note.ResizedImagePath);
+                            cmd.Parameters.AddWithValue("$ImageDisplayHeight", note.ImageDisplayHeight);
 
                             // リマインダー情報を保存
                             var reminderInfo = note.GetReminderInfo();
