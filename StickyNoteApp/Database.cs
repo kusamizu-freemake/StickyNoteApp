@@ -45,7 +45,7 @@ namespace StickyNoteApp
         }
 
         /// <summary>
-        /// 接続を開き、必要な PRAGMA（busy_timeout, journal_mode=WAL）を設定して返すヘルパー
+        /// 接続を開き、必要な PRAGMA（busy_timeout, journal_mode=WAL）を設定して返すヘルパー 検証用
         /// </summary>
         private static SqliteConnection OpenConnection()
         {

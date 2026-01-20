@@ -199,11 +199,11 @@ namespace StickyNoteApp
                 // 重要：すべての復元処理が完了したらグローバルフラグを下ろす
                 Common.EndRestore();
 
-                // UIが落ち着いた後で保存を有効化
-                this.BeginInvoke(new Action(() =>
-                {
-                    Common.EnableSave();
-                }));
+                //// UIが落ち着いた後で保存を有効化 ビルドエラー対策のためコメントアウト
+                //this.BeginInvoke(new Action(() =>
+                //{
+                //    Common.EnableSave();
+                //}));
             }
         }
         /// <summary>
