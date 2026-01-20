@@ -11,6 +11,9 @@ namespace StickyNoteApp
     {
         // 定数定義
 
+        // 変更があったかどうか
+        //private bool needsSave = false;
+
         // リサイズ関連
         private const int RESIZE_BORDER_WIDTH = 8; // リサイズ可能な枠の幅
         private const int MIN_WIDTH = 150; // 最小幅
@@ -41,7 +44,7 @@ namespace StickyNoteApp
         private Point dragStart;
 
         // 復元中フラグ
-        private bool isRestoring = false;
+        //private bool isRestoring = false;
 
         // サイズ変更用の変数
         private bool resizing = false;
@@ -96,45 +99,67 @@ namespace StickyNoteApp
 
             // 最前面表示の初期状態を反映
             UpdateTopMostMenuState();
+
         }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        //private void InitializeSaveEvents()
+        //{
+        //    // 内容変更検知（保存はしない）
+        //    txtNote.TextChanged += TxtNote_TextChanged;
+
+        //    // 移動・操作完了
+        //    this.MouseUp += TxtNote_MouseUp;
+
+            // リサイズ完了（修正要）
+            //this.ResizeEnd += ResizeImage;
+        //}
+
+        //private void TxtNote_TextChanged(object sender, EventArgs e)
+        //{
+        //    if (Common.IsRestoring) return;
+        //}
 
         /// <summary>
         /// 付箋内容変更検知用のイベントハンドラーの初期化
         /// </summary>
         private void InitializeEventHandlers()
         {
-            // フォームが非アクティブになった時に保存
-            this.Deactivate += StickyNoteForm_Deactivate;
+            // フォームが非アクティブになった時に保存 検証中
+            //this.Deactivate += StickyNoteForm_Deactivate;
+            
             // 背景色変更時：色変更操作完了時に保存
             this.BackColorChanged += BackColor_Changed;
         }
 
-        /// <summary>
+        /// <summary>　検証中
         /// 付箋ウィンドウが非アクティブ（フォーカスを失った）になったときに呼ばれる処理。
         /// 復元処理中でなければ、現在の付箋の状態を保存する。
         /// また、最前面表示（TopMost）が無効な場合は、再度付箋を前面に表示する。
         /// </summary>
-        private void StickyNoteForm_Deactivate(object sender, EventArgs e)
-        {
-            // 復元中は保存しない
-            if (isRestoring) return;
+        //private void StickyNoteForm_Deactivate(object sender, EventArgs e)
+        //{
+        //    // グローバル復元フラグをチェック
+        //    if (Common.IsRestoring) return;
 
-            SaveCurrentNoteState();
+        //    SaveCurrentNoteState();
 
-            // TopMostが無効な場合、付箋を前面に戻す
-            if (!this.TopMost)
-            {
-                this.BringToFront();
-            }
-        }
+        //    // TopMostが無効な場合、付箋を前面に戻す
+        //    if (!this.TopMost)
+        //    {
+        //        this.BringToFront();
+        //    }
+        //}
 
         /// <summary>
         /// 背景色変更時の処理
         /// </summary>
         private void BackColor_Changed(object sender, EventArgs e)
         {
-            // 復元中は保存しない
-            if (isRestoring) return;
+            // グローバル復元フラグをチェック
+            if (Common.IsRestoring) return;
 
             // 色変更完了時に保存
             SaveCurrentNoteState();
@@ -488,6 +513,9 @@ namespace StickyNoteApp
         /// </summary>
         public void SaveCurrentNoteState()
         {
+            // グローバル復元フラグをチェック
+            if (Common.IsRestoring) return;
+
             try
             {
                 // 現在の付箋情報をすべてDatabase.SaveOrUpdate()に渡す
@@ -703,39 +731,20 @@ namespace StickyNoteApp
         /// </summary>
         private void RemoveCapturedImage()
         {
+            // 先に画像を解放（順序が重要）
             if (pictureBox.Image != null)
             {
-                pictureBox.Image.Dispose();
-                pictureBox.Image = null;
+                var image = pictureBox.Image;
+                pictureBox.Image = null; // 先にnullを設定してロックを解除
+                image.Dispose(); // その後dispose
             }
 
             pictureBox.Height = 0;
             pictureBox.Visible = false;
 
-            // 元画像とリサイズ済み画像の両方を削除
-            if (!string.IsNullOrEmpty(originalImagePath) && System.IO.File.Exists(originalImagePath))
-            {
-                try
-                {
-                    System.IO.File.Delete(originalImagePath);
-                }
-                catch
-                {
-                    // ファイル削除失敗はユーザー操作に影響しないため無視
-                }
-            }
-
-            if (!string.IsNullOrEmpty(resizedImagePath) && System.IO.File.Exists(resizedImagePath))
-            {
-                try
-                {
-                    System.IO.File.Delete(resizedImagePath);
-                }
-                catch
-                {
-                    // ファイル削除失敗はユーザー操作に影響しないため無視
-                }
-            }
+            // ファイル削除（リトライ機能付き）
+            DeleteImageFileWithRetry(originalImagePath);
+            DeleteImageFileWithRetry(resizedImagePath);
 
             originalImagePath = null;
             resizedImagePath = null;
@@ -746,6 +755,38 @@ namespace StickyNoteApp
 
             // 画像削除完了時に保存
             SaveCurrentNoteState();
+        }
+
+        /// <summary>
+        /// 画像ファイルをリトライ付きで削除
+        /// </summary>
+        private void DeleteImageFileWithRetry(string filePath, int maxRetries = 3)
+        {
+            if (string.IsNullOrEmpty(filePath) || !System.IO.File.Exists(filePath))
+                return;
+
+            for (int i = 0; i < maxRetries; i++)
+            {
+                try
+                {
+                    System.IO.File.Delete(filePath);
+                    System.Diagnostics.Debug.WriteLine($"画像削除成功: {filePath}");
+                    return; // 成功したら終了
+                }
+                catch (System.IO.IOException ex)
+                {
+                    if (i < maxRetries - 1)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"画像削除リトライ {i + 1}/{maxRetries}: {filePath}");
+                        System.Threading.Thread.Sleep(100); // 100ms待機
+                    }
+                    else
+                    {
+                        System.Diagnostics.Debug.WriteLine($"画像削除失敗（最終リトライ）: {filePath} - {ex.Message}");
+                        // 最終的に失敗してもアプリは続行
+                    }
+                }
+            }
         }
 
         /// <summary>
@@ -782,6 +823,7 @@ namespace StickyNoteApp
 
                 // ドラッグ移動完了時に保存
                 SaveCurrentNoteState();
+
             }
         }
 
@@ -1036,8 +1078,9 @@ namespace StickyNoteApp
                     txtNote.Height = this.ClientSize.Height - txtNote.Top;
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"画像読み込みエラー: {ex.Message}");
                 // 画像読み込み失敗時は画像なしの状態で続行
             }
         }
@@ -1088,29 +1131,31 @@ namespace StickyNoteApp
         public void SetText(string text)
         {
             // 復元中フラグを立てる
-            isRestoring = true;
+            //isRestoring = true;
 
             txtNote.Text = text;
 
             // 復元中フラグを下ろす
-            isRestoring = false;
+            //isRestoring = false;
         }
 
         /// <summary>
-        /// 復元処理の開始を通知
+        /// 復元処理の開始を通知(確認後、削除予定）
+        /// グローバルフラグで制御されるため何もしない
         /// </summary>
-        public void BeginRestore()
-        {
-            isRestoring = true;
-        }
+        //public void BeginRestore()
+        //{
+        //    isRestoring = true;
+        //}
 
         /// <summary>
-        /// 復元処理の終了を通知
+        /// 復元処理の終了を通知(確認後、削除予定）
+        /// グローバルフラグで制御されるため何もしない
         /// </summary>
-        public void EndRestore()
-        {
-            isRestoring = false;
-        }
+        //public void EndRestore()
+        //{
+        //    isRestoring = false;
+        //}
 
         /// <summary>
         /// TopMostを設定（復元時用） ウィンドウを他のウィンドウより常に前面に表示する設定
@@ -1127,23 +1172,40 @@ namespace StickyNoteApp
         /// </summary>
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
+            // 検証用
+            //if (needsSave)
+            //{
+            //    SaveCurrentNoteState();
+            //}
+
             base.OnFormClosing(e);
 
+            // リマインダーを先に破棄
             if (reminderManager != null)
             {
                 reminderManager.Dispose();
+                reminderManager = null;
             }
 
-            // 画像のリソースを解放
+            // 画像のリソースを解放（順序変更）
             if (pictureBox != null && pictureBox.Image != null)
             {
-                pictureBox.Image.Dispose();
-                pictureBox.Image = null;
+                var image = pictureBox.Image;
+                pictureBox.Image = null; // 先にnullを設定
+                image.Dispose(); // その後dispose
             }
 
             // フォームクローズ時に最終保存
             System.Diagnostics.Debug.WriteLine($"[{NoteId}] 最終保存実行");
-            SaveCurrentNoteState();
+            try
+            {
+                SaveCurrentNoteState();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[{NoteId}] 最終保存失敗: {ex.Message}");
+                // クローズ時のエラーは無視
+            }
         }
     }
 }

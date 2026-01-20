@@ -1,5 +1,7 @@
 ﻿using Microsoft.Data.Sqlite;
 using System;
+using System.Collections.Generic;
+using System.Drawing;
 using System.IO;
 
 namespace StickyNoteApp
@@ -10,9 +12,8 @@ namespace StickyNoteApp
     /// </summary>
     public static class Database
     {
-        // 定数定義
+        // 定数定義（確認中、確認後削除予定）
         private const int DB_LOCK_RETRY_DELAY_MS = 50; // DBロック解放待ち時間（ミリ秒）
-
 
         // 「SQLite Error 5: 'database is locked'.」防止
         // ロックエラー対策用フラグ
@@ -27,8 +28,8 @@ namespace StickyNoteApp
             "stickynotes.db"
         );
 
-        // 接続文字列
-        private static readonly string ConnectionString = $"Data Source={DbPath}";
+        // 接続文字列 — Cache=Shared を追加し同一プロセス内での共有キャッシュを有効化
+        private static readonly string ConnectionString = $"Data Source={DbPath};Cache=Shared";
 
         /// <summary>
         /// 接続文字列を取得
@@ -36,12 +37,31 @@ namespace StickyNoteApp
         public static string GetConnectionString() => ConnectionString;
 
         /// <summary>
-        /// 新しいDB接続を生成する（都度接続用）
-        /// ※この時点ではopenされていない
+        /// 新しいDB接続を生成する（時点では open されていない）
         /// </summary>
         private static SqliteConnection CreateConnection()
         {
             return new SqliteConnection(ConnectionString);
+        }
+
+        /// <summary>
+        /// 接続を開き、必要な PRAGMA（busy_timeout, journal_mode=WAL）を設定して返すヘルパー
+        /// </summary>
+        private static SqliteConnection OpenConnection()
+        {
+            var con = CreateConnection();
+            con.Open();
+
+            // busy timeout と journal_mode を設定（WAL は同時実行性向上）
+            using (var cmd = con.CreateCommand())
+            {
+                // busy_timeout はミリ秒。ここでは 5000ms (=5秒) を設定。
+                // journal_mode=WAL はファイルを WAL モードに切り替えます（1回実行すれば永続的）。
+                cmd.CommandText = "PRAGMA busy_timeout = 5000; PRAGMA journal_mode = WAL;";
+                cmd.ExecuteNonQuery();
+            }
+
+            return con;
         }
 
         /// <summary>
@@ -65,10 +85,8 @@ namespace StickyNoteApp
                 }
 
                 // テーブル作成
-                using (SqliteConnection con = CreateConnection())
+                using (SqliteConnection con = OpenConnection()) // ← 変更: OpenConnection を使う
                 {
-                    con.Open();//← ここでDBに接続
-
                     // StickyNotesテーブル存在確認
                     if (!TableExists(con, "StickyNotes"))
                     {
@@ -133,7 +151,7 @@ namespace StickyNoteApp
         }
 
         /// <summary>
-        /// 既存の画像データを新しい構造に移行
+        /// 既存の画像データを新しい構造に移行　検証要
         /// </summary>
         private static void MigrateImageData(SqliteConnection con)
         {
@@ -255,24 +273,28 @@ namespace StickyNoteApp
         /// </summary>
         public static void SaveOrUpdate(StickyNoteForm note)
         {
+            // 重要：復元中は保存しない
+            if (Common.IsRestoring)
+            {
+                System.Diagnostics.Debug.WriteLine("[SaveOrUpdate] 復元中のため保存をスキップ");
+                return;
+            }
             //  順番待ち処理（ロックエラー防止）
             lock (saveLock)
             {
-                // 他の保存処理が終わるまで待つ
-                while (isSaving)
-                {
-                    System.Threading.Thread.Sleep(DB_LOCK_RETRY_DELAY_MS); // 50ミリ秒待機
-                }
+                // 他の保存処理が終わるまで待つ(編集・新規作成のたびに UI を止めている のが正体)
+                //while (isSaving)
+                //{
+                //    System.Threading.Thread.Sleep(DB_LOCK_RETRY_DELAY_MS); // 50ミリ秒待機
+                ////}
 
-                // 保存開始フラグを立てる
-                isSaving = true;
+                //// 保存開始フラグを立てる
+                //isSaving = true;
 
                 try
                 {
-                    using (SqliteConnection con = CreateConnection())
+                    using (SqliteConnection con = OpenConnection()) // ← 変更
                     {
-                        con.Open();//← 保存処理開始時にopen
-
                         // UPSERTクエリ(画像関連追加）
                         string sql = @"
                             INSERT INTO StickyNotes
@@ -337,12 +359,14 @@ namespace StickyNoteApp
                 }
                 catch (Exception ex)
                 {
-                    throw new Exception($"データ保存エラー: {ex.Message}", ex);
+                    System.Diagnostics.Debug.WriteLine($"データ保存エラー: {ex.Message}");
+                    // 例外を投げずにログだけ出力（復元中のエラーを防ぐ）
+                    // throw new Exception($"データ保存エラー: {ex.Message}", ex);
                 }
                 finally
                 {
-                    // 保存終了フラグを下ろす（必ず実行される）
-                    isSaving = false;
+                    // 保存終了フラグを下ろす（必ず実行される、(確認要））
+                    //isSaving = false;
                 }
             }
         }
@@ -352,6 +376,13 @@ namespace StickyNoteApp
         /// </summary>
         public static void SoftDelete(string id)
         {
+            // 復元中は削除しない
+            if (Common.IsRestoring)
+            {
+                System.Diagnostics.Debug.WriteLine("[SoftDelete] 復元中のため削除をスキップ");
+                return;
+            }
+
             // 順番待ち処理（ロックエラー防止）
             lock (saveLock)
             {
@@ -364,9 +395,8 @@ namespace StickyNoteApp
 
                 try
                 {
-                    using (SqliteConnection con = CreateConnection())
+                    using (SqliteConnection con = OpenConnection()) // ← 変更
                     {
-                        con.Open();//← 削除処理開始時にopen
                         string sql = @"UPDATE StickyNotes SET DeleteFlag = 1, UpdatedAt = $UpdatedAt WHERE Id = $Id";
 
                         using (var cmd = new SqliteCommand(sql, con))
@@ -379,7 +409,9 @@ namespace StickyNoteApp
                 }
                 catch (Exception ex)
                 {
-                    throw new Exception($"データ削除エラー: {ex.Message}", ex);
+                    System.Diagnostics.Debug.WriteLine($"データ削除エラー: {ex.Message}");
+                    // 例外を投げずにログだけ出力
+                    // throw new Exception($"データ削除エラー: {ex.Message}", ex)
                 }
                 finally
                 {
@@ -391,26 +423,57 @@ namespace StickyNoteApp
 
         /// <summary>
         /// 全付箋データを取得（DeleteFlag = 0 のもののみ）
+        /// 接続をすぐに閉じるため、Listで返す
         /// </summary>
-        public static SqliteDataReader LoadAll()
+        public static List<StickyNoteData> LoadAll()
         {
-            SqliteConnection con = null;
-            SqliteCommand cmd = null;
+            var notes = new List<StickyNoteData>();
 
             try
             {
-                // 接続を作成して開く
-                // DataReaderを呼び出し元で使用するため、このメソッド内ではusingを使わずに接続をopenする
-                con = CreateConnection();
-                con.Open();//← ここでopen
+                using (SqliteConnection con = OpenConnection()) // ← 変更
+                {
+                    using (var cmd = con.CreateCommand())
+                    {
+                        cmd.CommandText = "SELECT * FROM StickyNotes WHERE DeleteFlag = 0 ORDER BY CreatedAt ASC";
 
-                // コマンドを作成
-                cmd = con.CreateCommand();
-                cmd.CommandText = "SELECT * FROM StickyNotes WHERE DeleteFlag = 0 ORDER BY CreatedAt ASC";
+                        using (var reader = cmd.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                var noteData = new StickyNoteData
+                                {
+                                    Id = reader["Id"].ToString(),
+                                    Content = reader["Content"].ToString(),
+                                    PosX = Convert.ToInt32(reader["PosX"]),
+                                    PosY = Convert.ToInt32(reader["PosY"]),
+                                    Width = Convert.ToInt32(reader["Width"]),
+                                    Height = Convert.ToInt32(reader["Height"]),
+                                    BgR = Convert.ToInt32(reader["BgR"]),
+                                    BgG = Convert.ToInt32(reader["BgG"]),
+                                    BgB = Convert.ToInt32(reader["BgB"]),
+                                    TopMostFlag = Convert.ToInt32(reader["TopMostFlag"]),
+                                    ImagePath = reader["ImagePath"]?.ToString(),
+                                    OriginalImagePath = reader["OriginalImagePath"]?.ToString(),
+                                    ResizedImagePath = reader["ResizedImagePath"]?.ToString(),
+                                    ImageDisplayHeight = reader["ImageDisplayHeight"] != DBNull.Value
+                                        ? Convert.ToInt32(reader["ImageDisplayHeight"])
+                                        : 0,
+                                    ReminderActive = reader["ReminderActive"] != DBNull.Value
+                                        ? Convert.ToInt32(reader["ReminderActive"])
+                                        : 0,
+                                    ReminderTime = reader["ReminderTime"]?.ToString(),
+                                    CreatedAt = reader["CreatedAt"].ToString()
+                                };
 
-                // CloseConnectionを指定すると、ReaderがCloseされたタイミングで、接続も自動的にCloseされる
-                // ※ ただし、ExecuteReader 中に例外が発生した場合は自動では Close されない点に注意
-                return cmd.ExecuteReader(System.Data.CommandBehavior.CloseConnection);
+                                notes.Add(noteData);
+                            }
+                        }
+                    }
+                } // ← usingを抜けると確実にcloseされる
+
+                System.Diagnostics.Debug.WriteLine($"データベースから{notes.Count}件の付箋を読み込みました");
+                return notes;
             }
             catch (Exception ex)
             {
@@ -418,11 +481,34 @@ namespace StickyNoteApp
                 // 接続（con）とコマンド（cmd）をここで明示的に後始末する。
                 // Disposeは内部でCloseも呼ぶため、Close() を個別に呼ぶ必要はなく Dispose() だけで十分
                 // 
-                cmd?.Dispose();
-                con?.Dispose();
-
+                //cmd?.Dispose();
+                //con?.Dispose();
                 throw new Exception($"データ読み込みエラー: {ex.Message}", ex);
             }
         }
+    }
+
+    /// <summary>
+    /// 付箋データ格納用クラス（データベースから読み込んだデータを保持）
+    /// </summary>
+    public class StickyNoteData
+    {
+        public string Id { get; set; }
+        public string Content { get; set; }
+        public int PosX { get; set; }
+        public int PosY { get; set; }
+        public int Width { get; set; }
+        public int Height { get; set; }
+        public int BgR { get; set; }
+        public int BgG { get; set; }
+        public int BgB { get; set; }
+        public int TopMostFlag { get; set; }
+        public string ImagePath { get; set; }
+        public string OriginalImagePath { get; set; }
+        public string ResizedImagePath { get; set; }
+        public int ImageDisplayHeight { get; set; }
+        public int ReminderActive { get; set; }
+        public string ReminderTime { get; set; }
+        public string CreatedAt { get; set; }
     }
 }
