@@ -17,7 +17,6 @@ namespace StickyNoteApp
         private const int TRAY_BALLOON_TIP_DURATION = 2000; // トレイアイコンのバルーンチップ表示時間(ミリ秒)
         private const int TRAY_BALLOON_TIP_DURATION_SHORT = 1000; // トレイアイコンのバルーンチップ表示時間(短)(ミリ秒)
 
-
         private static NotifyIcon TrayIcon; // タスクトレイアイコン
         private ContextMenuStrip TrayMenu; // トレイメニュー
         private ToolStripMenuItem ToggleAllNotesMenuItem; // すべての付箋表示/非表示メニュー
@@ -62,11 +61,9 @@ namespace StickyNoteApp
             ToggleAllNotesMenuItem.ShortcutKeyDisplayString = "Ctrl+Shift+H";
             ToggleAllNotesMenuItem.Click += OnShowHideAllStickyNotesClicked;
             TrayMenu.Items.Add(ToggleAllNotesMenuItem);
-
             // DB整合性チェック（デバッグ用。完成間際で削除予定）
             TrayMenu.Items.Add(new ToolStripSeparator()); // 区切り線
             TrayMenu.Items.Add("データベース整合性チェック", null, OnDatabaseIntegrityCheckClicked);
-
 
             // 設定（未実装）
             TrayMenu.Items.Add("設定", null, OnSettingClicked);
@@ -120,7 +117,7 @@ namespace StickyNoteApp
                     restoredCount++;
 
                     StickyNoteForm note = new StickyNoteForm();
-                    
+
                     // データベースから値を復元
                     note.NoteId = noteData.Id;
                     note.CreatedAt = noteData.CreatedAt;
@@ -157,20 +154,20 @@ namespace StickyNoteApp
                     // リマインダー復元
                     if (noteData.ReminderActive == 1 && !string.IsNullOrEmpty(noteData.ReminderTime))
                     {
-                            DateTime reminderTime;
-                            if (DateTime.TryParse(noteData.ReminderTime, out reminderTime))
+                        DateTime reminderTime;
+                        if (DateTime.TryParse(noteData.ReminderTime, out reminderTime))
+                        {
+                            if (reminderTime > DateTime.Now)
                             {
-                                if (reminderTime > DateTime.Now)
-                                {
-                                    note.RestoreReminder(reminderTime);
-                                    reminderRestoredCount++;
-                                    System.Diagnostics.Debug.WriteLine($"リマインダー復元: {noteData.Id} - {reminderTime}");
-                                }
-                                else
-                                {
-                                    System.Diagnostics.Debug.WriteLine($"リマインダー期限切れ: {noteData.Id} - {reminderTime}");
-                                }
+                                note.RestoreReminder(reminderTime);
+                                reminderRestoredCount++;
+                                System.Diagnostics.Debug.WriteLine($"リマインダー復元: {noteData.Id} - {reminderTime}");
                             }
+                            else
+                            {
+                                System.Diagnostics.Debug.WriteLine($"リマインダー期限切れ: {noteData.Id} - {reminderTime}");
+                            }
+                        }
                     }
                     // 個別のEndRestore()は不要
 
@@ -198,14 +195,9 @@ namespace StickyNoteApp
             {
                 // 重要：すべての復元処理が完了したらグローバルフラグを下ろす
                 Common.EndRestore();
-
-                //// UIが落ち着いた後で保存を有効化 ビルドエラー対策のためコメントアウト
-                //this.BeginInvoke(new Action(() =>
-                //{
-                //    Common.EnableSave();
-                //}));
             }
         }
+
         /// <summary>
         /// 新しい付箋を作成
         /// </summary>
@@ -259,8 +251,6 @@ namespace StickyNoteApp
             }
         }
 
-
-
         /// <summary>
         /// データベース整合性チェック
         /// </summary>
@@ -268,9 +258,9 @@ namespace StickyNoteApp
         {
             try
             {
-                // 確認ダイアログを表示
                 var result = MessageBox.Show(
                     "データベースの整合性チェックと修正を実行します。\n\n" +
+                    "実行中は付箋の保存が一時停止されます。\n\n" +
                     "実行しますか？",
                     "データベース整合性チェック",
                     MessageBoxButtons.YesNo,
@@ -279,21 +269,37 @@ namespace StickyNoteApp
 
                 if (result == DialogResult.Yes)
                 {
-                    // 整合性チェックと修正を実行
-                    DatabaseIntegrityChecker.CheckAndRepair();
+                    // 整合性チェック中は保存を停止
+                    bool wasRestoring = Common.IsRestoring;
+                    Common.BeginRestore();
 
-                    // 詳細レポートを表示するか確認
-                    var reportResult = MessageBox.Show(
-                        "整合性チェックが完了しました。\n\n" +
-                        "詳細レポートを表示しますか？",
-                        "完了",
-                        MessageBoxButtons.YesNo,
-                        MessageBoxIcon.Information
-                    );
-
-                    if (reportResult == DialogResult.Yes)
+                    try
                     {
-                        DatabaseIntegrityChecker.GenerateReport();
+                        // 整合性チェックと修正を実行
+                        DatabaseIntegrityChecker.CheckAndRepair();
+
+                        // 詳細レポートを表示するか確認
+                        var reportResult = MessageBox.Show(
+                            "整合性チェックが完了しました。\n\n" +
+                            "詳細レポートを表示しますか？",
+                            "完了",
+                            MessageBoxButtons.YesNo,
+                            MessageBoxIcon.Information
+                        );
+
+                        if (reportResult == DialogResult.Yes)
+                        {
+                            DatabaseIntegrityChecker.GenerateReport();
+                        }
+                    }
+                    finally
+                    {
+                        if (!wasRestoring)
+                        {
+                            // 保存を再開
+                            Common.EndRestore();
+                        }
+                        System.Diagnostics.Debug.WriteLine("[整合性チェック完了] 保存を再開しました");
                     }
                 }
             }

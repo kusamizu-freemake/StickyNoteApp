@@ -114,11 +114,18 @@ namespace StickyNoteApp
             try
             {
                 // 各処理ごとに接続を開閉
-
                 int totalRecords, activeRecords, deletedRecords;
                 using (var con = new SqliteConnection(Database.GetConnectionString()))
                 {
                     con.Open();
+
+                    // busy_timeout を設定
+                    using (var cmd = con.CreateCommand())
+                    {
+                        cmd.CommandText = "PRAGMA busy_timeout = 10000;"; // 10秒
+                        cmd.ExecuteNonQuery();
+                    }
+
                     totalRecords = GetTotalRecordCount(con);
                     activeRecords = GetActiveRecordCount(con);
                     deletedRecords = GetDeletedRecordCount(con);
@@ -134,14 +141,31 @@ namespace StickyNoteApp
                 using (var con = new SqliteConnection(Database.GetConnectionString()))
                 {
                     con.Open();
+
+                    // busy_timeout を設定
+                    using (var cmd = con.CreateCommand())
+                    {
+                        cmd.CommandText = "PRAGMA busy_timeout = 10000;";
+                        cmd.ExecuteNonQuery();
+                    }
+
                     emptyContentRecords = FindEmptyContentRecords(con);
                 }
+
                 Log($"空のContentを持つレコード: {emptyContentRecords.Count}件");
 
                 List<string> duplicateIds;
                 using (var con = new SqliteConnection(Database.GetConnectionString()))
                 {
                     con.Open();
+
+                    // busy_timeout を設定
+                    using (var cmd = con.CreateCommand())
+                    {
+                        cmd.CommandText = "PRAGMA busy_timeout = 10000;";
+                        cmd.ExecuteNonQuery();
+                    }
+
                     duplicateIds = FindDuplicateIds(con);
                 }
 
@@ -159,11 +183,43 @@ namespace StickyNoteApp
                 }
                 Log("");
 
-                int purgedCount;
-                using (var con = new SqliteConnection(Database.GetConnectionString()))
+                // PurgeOldDeletedRecords を実行（リトライ機能付き）
+                int purgedCount = 0;
+                int retryCount = 0;
+                const int maxRetries = 3;
+
+                while (retryCount < maxRetries)
                 {
-                    con.Open();
-                    purgedCount = PurgeOldDeletedRecords(con, days: 30);
+                    try
+                    {
+                        using (var con = new SqliteConnection(Database.GetConnectionString()))
+                        {
+                            con.Open();
+
+                            // busy_timeout を設定
+                            using (var cmd = con.CreateCommand())
+                            {
+                                cmd.CommandText = "PRAGMA busy_timeout = 10000;";
+                                cmd.ExecuteNonQuery();
+                            }
+
+                            purgedCount = PurgeOldDeletedRecords(con, days: 30);
+                        }
+                        break; // 成功したらループを抜ける
+                    }
+                    catch (SqliteException ex) when (ex.SqliteErrorCode == 5) // SQLITE_BUSY
+                    {
+                        retryCount++;
+                        if (retryCount >= maxRetries)
+                        {
+                            Log($"警告: 古いレコードの削除をスキップしました（データベースビジー）");
+                            purgedCount = 0;
+                        }
+                        else
+                        {
+                            System.Threading.Thread.Sleep(1000); // 1秒待機してリトライ
+                        }
+                    }
                 }
 
                 if (purgedCount > 0)
@@ -179,6 +235,14 @@ namespace StickyNoteApp
                 using (var con = new SqliteConnection(Database.GetConnectionString()))
                 {
                     con.Open();
+
+                    // busy_timeout を設定
+                    using (var cmd = con.CreateCommand())
+                    {
+                        cmd.CommandText = "PRAGMA busy_timeout = 10000;";
+                        cmd.ExecuteNonQuery();
+                    }
+
                     fixedCount = FixInvalidData(con);
                 }
 
@@ -191,11 +255,6 @@ namespace StickyNoteApp
                     Log("✓ 不正なデータなし");
                 }
                 Log("");
-
-                using (var con = new SqliteConnection(Database.GetConnectionString()))
-                {
-                    con.Open();
-                }
 
                 Log("✓ データベース最適化完了");
                 Log("");

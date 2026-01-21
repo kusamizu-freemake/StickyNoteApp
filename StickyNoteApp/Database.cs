@@ -12,12 +12,7 @@ namespace StickyNoteApp
     /// </summary>
     public static class Database
     {
-        // 定数定義（確認中、確認後削除予定）
-        private const int DB_LOCK_RETRY_DELAY_MS = 50; // DBロック解放待ち時間（ミリ秒）
-
         // 「SQLite Error 5: 'database is locked'.」防止
-        // ロックエラー対策用フラグ
-        private static bool isSaving = false;
         // DB保存処理の排他制御用ロックオブジェクト
         private static readonly object saveLock = new object();
 
@@ -28,8 +23,8 @@ namespace StickyNoteApp
             "stickynotes.db"
         );
 
-        // 接続文字列 — Cache=Shared を追加し同一プロセス内での共有キャッシュを有効化
-        private static readonly string ConnectionString = $"Data Source={DbPath};Cache=Shared";
+        // 接続文字列
+        private static readonly string ConnectionString = $"Data Source={DbPath};";
 
         /// <summary>
         /// 接続文字列を取得
@@ -45,19 +40,16 @@ namespace StickyNoteApp
         }
 
         /// <summary>
-        /// 接続を開き、必要な PRAGMA（busy_timeout, journal_mode=WAL）を設定して返すヘルパー 検証用
+        /// SQLite データベース接続を生成し、Open した状態で返す。
+        /// 接続直後にコマンドを実行し、接続が有効であることを確認する。
         /// </summary>
         private static SqliteConnection OpenConnection()
         {
             var con = CreateConnection();
             con.Open();
 
-            // busy timeout と journal_mode を設定（WAL は同時実行性向上）
             using (var cmd = con.CreateCommand())
             {
-                // busy_timeout はミリ秒。ここでは 5000ms (=5秒) を設定。
-                // journal_mode=WAL はファイルを WAL モードに切り替えます（1回実行すれば永続的）。
-                cmd.CommandText = "PRAGMA busy_timeout = 5000; PRAGMA journal_mode = WAL;";
                 cmd.ExecuteNonQuery();
             }
 
@@ -151,7 +143,7 @@ namespace StickyNoteApp
         }
 
         /// <summary>
-        /// 既存の画像データを新しい構造に移行　検証要
+        /// 既存の画像データを新しい構造に移行 検証要
         /// </summary>
         private static void MigrateImageData(SqliteConnection con)
         {
@@ -273,7 +265,7 @@ namespace StickyNoteApp
         /// </summary>
         public static void SaveOrUpdate(StickyNoteForm note)
         {
-            // 重要：復元中は保存しない
+            // 復元中は保存しない
             if (Common.IsRestoring)
             {
                 System.Diagnostics.Debug.WriteLine("[SaveOrUpdate] 復元中のため保存をスキップ");
@@ -282,15 +274,6 @@ namespace StickyNoteApp
             //  順番待ち処理（ロックエラー防止）
             lock (saveLock)
             {
-                // 他の保存処理が終わるまで待つ(編集・新規作成のたびに UI を止めている のが正体)
-                //while (isSaving)
-                //{
-                //    System.Threading.Thread.Sleep(DB_LOCK_RETRY_DELAY_MS); // 50ミリ秒待機
-                ////}
-
-                //// 保存開始フラグを立てる
-                //isSaving = true;
-
                 try
                 {
                     using (SqliteConnection con = OpenConnection()) // ← 変更
@@ -360,13 +343,6 @@ namespace StickyNoteApp
                 catch (Exception ex)
                 {
                     System.Diagnostics.Debug.WriteLine($"データ保存エラー: {ex.Message}");
-                    // 例外を投げずにログだけ出力（復元中のエラーを防ぐ）
-                    // throw new Exception($"データ保存エラー: {ex.Message}", ex);
-                }
-                finally
-                {
-                    // 保存終了フラグを下ろす（必ず実行される、(確認要））
-                    //isSaving = false;
                 }
             }
         }
@@ -386,13 +362,6 @@ namespace StickyNoteApp
             // 順番待ち処理（ロックエラー防止）
             lock (saveLock)
             {
-                while (isSaving)
-                {
-                    System.Threading.Thread.Sleep(DB_LOCK_RETRY_DELAY_MS); // 50ミリ秒待機
-                }
-
-                isSaving = true;
-
                 try
                 {
                     using (SqliteConnection con = OpenConnection()) // ← 変更
@@ -410,13 +379,6 @@ namespace StickyNoteApp
                 catch (Exception ex)
                 {
                     System.Diagnostics.Debug.WriteLine($"データ削除エラー: {ex.Message}");
-                    // 例外を投げずにログだけ出力
-                    // throw new Exception($"データ削除エラー: {ex.Message}", ex)
-                }
-                finally
-                {
-                    // 保存終了フラグを下ろす
-                    isSaving = false;
                 }
             }
         }
@@ -477,12 +439,6 @@ namespace StickyNoteApp
             }
             catch (Exception ex)
             {
-                // 例外発生時はまだ Reader が返っておらず自動で Close されない可能性があるため、
-                // 接続（con）とコマンド（cmd）をここで明示的に後始末する。
-                // Disposeは内部でCloseも呼ぶため、Close() を個別に呼ぶ必要はなく Dispose() だけで十分
-                // 
-                //cmd?.Dispose();
-                //con?.Dispose();
                 throw new Exception($"データ読み込みエラー: {ex.Message}", ex);
             }
         }

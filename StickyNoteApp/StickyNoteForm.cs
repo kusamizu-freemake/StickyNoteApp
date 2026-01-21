@@ -11,9 +11,6 @@ namespace StickyNoteApp
     {
         // 定数定義
 
-        // 変更があったかどうか
-        //private bool needsSave = false;
-
         // リサイズ関連
         private const int RESIZE_BORDER_WIDTH = 8; // リサイズ可能な枠の幅
         private const int MIN_WIDTH = 150; // 最小幅
@@ -42,9 +39,6 @@ namespace StickyNoteApp
         // ドラッグ移動用の変数
         private bool dragging = false;
         private Point dragStart;
-
-        // 復元中フラグ
-        //private bool isRestoring = false;
 
         // サイズ変更用の変数
         private bool resizing = false;
@@ -103,55 +97,35 @@ namespace StickyNoteApp
         }
 
         /// <summary>
-        /// 
-        /// </summary>
-        //private void InitializeSaveEvents()
-        //{
-        //    // 内容変更検知（保存はしない）
-        //    txtNote.TextChanged += TxtNote_TextChanged;
-
-        //    // 移動・操作完了
-        //    this.MouseUp += TxtNote_MouseUp;
-
-            // リサイズ完了（修正要）
-            //this.ResizeEnd += ResizeImage;
-        //}
-
-        //private void TxtNote_TextChanged(object sender, EventArgs e)
-        //{
-        //    if (Common.IsRestoring) return;
-        //}
-
-        /// <summary>
         /// 付箋内容変更検知用のイベントハンドラーの初期化
         /// </summary>
         private void InitializeEventHandlers()
         {
             // フォームが非アクティブになった時に保存 検証中
-            //this.Deactivate += StickyNoteForm_Deactivate;
+            this.Deactivate += StickyNoteForm_Deactivate;
             
             // 背景色変更時：色変更操作完了時に保存
             this.BackColorChanged += BackColor_Changed;
         }
 
-        /// <summary>　検証中
+        /// <summary>
         /// 付箋ウィンドウが非アクティブ（フォーカスを失った）になったときに呼ばれる処理。
         /// 復元処理中でなければ、現在の付箋の状態を保存する。
         /// また、最前面表示（TopMost）が無効な場合は、再度付箋を前面に表示する。
-        /// </summary>
-        //private void StickyNoteForm_Deactivate(object sender, EventArgs e)
-        //{
-        //    // グローバル復元フラグをチェック
-        //    if (Common.IsRestoring) return;
+        ///</summary>
+        private void StickyNoteForm_Deactivate(object sender, EventArgs e)
+        {
+            // グローバル復元フラグをチェック
+            if (Common.IsRestoring) return;
 
-        //    SaveCurrentNoteState();
+            SaveCurrentNoteState();
 
-        //    // TopMostが無効な場合、付箋を前面に戻す
-        //    if (!this.TopMost)
-        //    {
-        //        this.BringToFront();
-        //    }
-        //}
+            // TopMostが無効な場合、付箋を前面に戻す
+            if (!this.TopMost)
+            {
+                this.BringToFront();
+            }
+        }
 
         /// <summary>
         /// 背景色変更時の処理
@@ -1130,32 +1104,8 @@ namespace StickyNoteApp
         /// </summary>
         public void SetText(string text)
         {
-            // 復元中フラグを立てる
-            //isRestoring = true;
-
             txtNote.Text = text;
-
-            // 復元中フラグを下ろす
-            //isRestoring = false;
         }
-
-        /// <summary>
-        /// 復元処理の開始を通知(確認後、削除予定）
-        /// グローバルフラグで制御されるため何もしない
-        /// </summary>
-        //public void BeginRestore()
-        //{
-        //    isRestoring = true;
-        //}
-
-        /// <summary>
-        /// 復元処理の終了を通知(確認後、削除予定）
-        /// グローバルフラグで制御されるため何もしない
-        /// </summary>
-        //public void EndRestore()
-        //{
-        //    isRestoring = false;
-        //}
 
         /// <summary>
         /// TopMostを設定（復元時用） ウィンドウを他のウィンドウより常に前面に表示する設定
@@ -1172,11 +1122,6 @@ namespace StickyNoteApp
         /// </summary>
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
-            // 検証用
-            //if (needsSave)
-            //{
-            //    SaveCurrentNoteState();
-            //}
 
             base.OnFormClosing(e);
 
