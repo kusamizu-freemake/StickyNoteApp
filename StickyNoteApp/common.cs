@@ -13,8 +13,8 @@ namespace StickyNoteApp
 
         // DB保存を許可してよいか
         public static bool IsSaveEnabled { get; private set; } = false;
-        
-        // 
+
+        // 画像データ移行中かどうか
         public static bool IsImageMigrating { get; private set; } = false;
 
         public static bool CanSaveDatabase =>

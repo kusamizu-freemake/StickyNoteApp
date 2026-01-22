@@ -80,8 +80,6 @@ namespace StickyNoteApp
                 // テーブル作成
                 using (SqliteConnection con = OpenConnection()) // ← 変更: OpenConnection を使う
                 {
-                    con.Open();//← ここでDBに接続
-
                     // StickyNotesテーブル存在確認
                     if (!TableExists(con, "StickyNotes"))
                     {
