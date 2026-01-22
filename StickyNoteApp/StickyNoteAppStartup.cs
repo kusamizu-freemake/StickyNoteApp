@@ -43,19 +43,6 @@ namespace StickyNoteApp
                 return; // エラーの場合は終了
             }
 
-            // 整合性チェック実行
-            try
-            {
-                System.Diagnostics.Debug.WriteLine("Startup: 整合性チェック開始");
-                DatabaseIntegrityChecker.CheckAndRepair();
-                DatabaseIntegrityChecker.GenerateReport();
-                System.Diagnostics.Debug.WriteLine("Startup: 整合性チェック完了");
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"整合性チェックエラー:\n{ex.Message}", "エラー", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-
             // アプリケーション実行
             System.Diagnostics.Debug.WriteLine("Startup: TrayManagerForm起動");
             Application.Run(new TrayManagerForm());
