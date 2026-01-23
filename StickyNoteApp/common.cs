@@ -39,35 +39,5 @@ namespace StickyNoteApp
             // ここではまだ保存を有効にしない
             System.Diagnostics.Debug.WriteLine("[Common] 復元処理完了（保存はまだ無効）");
         }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        public static void EnableSave()
-        {
-            IsSaveEnabled = true;
-            System.Diagnostics.Debug.WriteLine("[Common] データベース保存を有効化");
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        public static void BeginImageMigration()
-        {
-            IsImageMigrating = true;
-            IsSaveEnabled = false;
-            Debug.WriteLine("[Common] 画像データ移行開始");
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        public static void EndImageMigration()
-        {
-            IsImageMigrating = false;
-            IsSaveEnabled = true;
-            Debug.WriteLine("[Common] 画像データ移行完了");
-        }
-
     }
 }
