@@ -37,41 +37,65 @@ namespace StickyNoteApp
 
             try
             {
+                // 各処理ごとに接続を開閉
+
+                int totalRecords, activeRecords, deletedRecords;
                 using (var con = new SqliteConnection(Database.GetConnectionString()))
                 {
                     con.Open();
+                    totalRecords = GetTotalRecordCount(con);
+                    activeRecords = GetActiveRecordCount(con);
+                    deletedRecords = GetDeletedRecordCount(con);
+                } // ← 接続を閉じる
 
-                    int totalRecords = GetTotalRecordCount(con);
-                    int activeRecords = GetActiveRecordCount(con);
-                    int deletedRecords = GetDeletedRecordCount(con);
+                Log($"レコード統計: 総数={totalRecords}, 有効={activeRecords}, 削除済み={deletedRecords}");
 
-                    Log($"レコード統計: 総数={totalRecords}, 有効={activeRecords}, 削除済み={deletedRecords}");
+                List<string> emptyContentRecords;
+                using (var con = new SqliteConnection(Database.GetConnectionString()))
+                {
+                    con.Open();
+                    emptyContentRecords = FindEmptyContentRecords(con);
+                } // ← 接続を閉じる
 
-                    var emptyContentRecords = FindEmptyContentRecords(con);
-                    Log($"空のContentを持つレコード: {emptyContentRecords.Count}件");
+                Log($"空のContentを持つレコード: {emptyContentRecords.Count}件");
 
-                    var duplicateIds = FindDuplicateIds(con);
-                    if (duplicateIds.Count > 0)
-                    {
-                        Log($"警告: 重複ID発見: {duplicateIds.Count}件");
-                    }
+                List<string> duplicateIds;
+                using (var con = new SqliteConnection(Database.GetConnectionString()))
+                {
+                    con.Open();
+                    duplicateIds = FindDuplicateIds(con);
+                } // ← 接続を閉じる
 
-                    int purgedCount = PurgeOldDeletedRecords(con, days: 30);
-                    if (purgedCount > 0)
-                    {
-                        Log($"物理削除されたレコード: {purgedCount}件");
-                    }
-
-                    int fixedCount = FixInvalidData(con);
-                    if (fixedCount > 0)
-                    {
-                        Log($"修正されたレコード: {fixedCount}件");
-                    }
-
-                    OptimizeDatabase(con);
-                    Log("✓ データベース最適化完了");
+                if (duplicateIds.Count > 0)
+                {
+                    Log($"警告: 重複ID発見: {duplicateIds.Count}件");
                 }
 
+                int purgedCount;
+                using (var con = new SqliteConnection(Database.GetConnectionString()))
+                {
+                    con.Open();
+                    purgedCount = PurgeOldDeletedRecords(con, days: 30);
+                } // ← 接続を閉じる
+
+                if (purgedCount > 0)
+                {
+                    Log($"物理削除されたレコード: {purgedCount}件");
+                }
+
+                int fixedCount;
+                using (var con = new SqliteConnection(Database.GetConnectionString()))
+                {
+                    con.Open();
+                    fixedCount = FixInvalidData(con);
+                } // ← 接続を閉じる
+
+                if (fixedCount > 0)
+                {
+                    Log($"修正されたレコード: {fixedCount}件");
+                }
+
+                Log("✓ データベース最適化完了");
                 Log("=== データベース整合性チェック完了 ===");
             }
             catch (Exception ex)
@@ -81,9 +105,6 @@ namespace StickyNoteApp
             }
         }
 
-        /// <summary>
-        /// データベースの整合性をチェックし、問題を修正（メッセージボックス表示）
-        /// </summary>
         public static void CheckAndRepair()
         {
             logBuilder.Clear();
@@ -92,76 +113,152 @@ namespace StickyNoteApp
 
             try
             {
+                // 各処理ごとに接続を開閉
+                int totalRecords, activeRecords, deletedRecords;
                 using (var con = new SqliteConnection(Database.GetConnectionString()))
                 {
                     con.Open();
-                    // 1. 全レコード数の確認
 
-                    int totalRecords = GetTotalRecordCount(con);
-                    int activeRecords = GetActiveRecordCount(con);
-                    int deletedRecords = GetDeletedRecordCount(con);
-
-                    Log($"レコード統計:");
-                    Log($"  総レコード数: {totalRecords}");
-                    Log($"  有効なレコード: {activeRecords}");
-                    Log($"  削除済みレコード: {deletedRecords}");
-                    Log("");
-
-                    // 2. 空のContentを持つレコードのチェック
-
-                    var emptyContentRecords = FindEmptyContentRecords(con);
-                    Log($"空のContentを持つレコード: {emptyContentRecords.Count}件");
-
-                    // 3. 重複IDのチェック
-
-                    var duplicateIds = FindDuplicateIds(con);
-                    if (duplicateIds.Count > 0)
+                    // busy_timeout を設定
+                    using (var cmd = con.CreateCommand())
                     {
-                        Log($"⚠️ 警告: 重複ID発見: {duplicateIds.Count}件");
-                        foreach (var id in duplicateIds)
-                        {
-                            Log($"    - {id.Substring(0, 8)}...");
-                        }
-                    }
-                    else
-                    {
-                        Log("✓ 重複IDなし");
-                    }
-                    Log("");
-
-                    // 4. 古い削除済みレコードの物理削除
-
-                    int purgedCount = PurgeOldDeletedRecords(con, days: 30);
-                    if (purgedCount > 0)
-                    {
-                        Log($"物理削除されたレコード: {purgedCount}件");
-                    }
-                    else
-                    {
-                        Log("物理削除の必要なし");
+                        cmd.CommandText = "PRAGMA busy_timeout = 10000;"; // 10秒
+                        cmd.ExecuteNonQuery();
                     }
 
-                    // 5. 不正なデータの修正
-
-                    int fixedCount = FixInvalidData(con);
-                    if (fixedCount > 0)
-                    {
-                        Log($"修正されたレコード: {fixedCount}件");
-                    }
-                    else
-                    {
-                        Log("✓ 不正なデータなし");
-                    }
-                    Log("");
-
-                    OptimizeDatabase(con);
-                    Log("✓ データベース最適化完了");
+                    totalRecords = GetTotalRecordCount(con);
+                    activeRecords = GetActiveRecordCount(con);
+                    deletedRecords = GetDeletedRecordCount(con);
                 }
 
+                Log($"レコード統計:");
+                Log($"  総レコード数: {totalRecords}");
+                Log($"  有効なレコード: {activeRecords}");
+                Log($"  削除済みレコード: {deletedRecords}");
+                Log("");
+
+                List<string> emptyContentRecords;
+                using (var con = new SqliteConnection(Database.GetConnectionString()))
+                {
+                    con.Open();
+
+                    // busy_timeout を設定
+                    using (var cmd = con.CreateCommand())
+                    {
+                        cmd.CommandText = "PRAGMA busy_timeout = 10000;";
+                        cmd.ExecuteNonQuery();
+                    }
+
+                    emptyContentRecords = FindEmptyContentRecords(con);
+                }
+
+                Log($"空のContentを持つレコード: {emptyContentRecords.Count}件");
+
+                List<string> duplicateIds;
+                using (var con = new SqliteConnection(Database.GetConnectionString()))
+                {
+                    con.Open();
+
+                    // busy_timeout を設定
+                    using (var cmd = con.CreateCommand())
+                    {
+                        cmd.CommandText = "PRAGMA busy_timeout = 10000;";
+                        cmd.ExecuteNonQuery();
+                    }
+
+                    duplicateIds = FindDuplicateIds(con);
+                }
+
+                if (duplicateIds.Count > 0)
+                {
+                    Log($"⚠️ 警告: 重複ID発見: {duplicateIds.Count}件");
+                    foreach (var id in duplicateIds)
+                    {
+                        Log($"    - {id.Substring(0, 8)}...");
+                    }
+                }
+                else
+                {
+                    Log("✓ 重複IDなし");
+                }
+                Log("");
+
+                // PurgeOldDeletedRecords を実行（リトライ機能付き）
+                int purgedCount = 0;
+                int retryCount = 0;
+                const int maxRetries = 3;
+
+                while (retryCount < maxRetries)
+                {
+                    try
+                    {
+                        using (var con = new SqliteConnection(Database.GetConnectionString()))
+                        {
+                            con.Open();
+
+                            // busy_timeout を設定
+                            using (var cmd = con.CreateCommand())
+                            {
+                                cmd.CommandText = "PRAGMA busy_timeout = 10000;";
+                                cmd.ExecuteNonQuery();
+                            }
+
+                            purgedCount = PurgeOldDeletedRecords(con, days: 30);
+                        }
+                        break; // 成功したらループを抜ける
+                    }
+                    catch (SqliteException ex) when (ex.SqliteErrorCode == 5) // SQLITE_BUSY
+                    {
+                        retryCount++;
+                        if (retryCount >= maxRetries)
+                        {
+                            Log($"警告: 古いレコードの削除をスキップしました（データベースビジー）");
+                            purgedCount = 0;
+                        }
+                        else
+                        {
+                            System.Threading.Thread.Sleep(1000); // 1秒待機してリトライ
+                        }
+                    }
+                }
+
+                if (purgedCount > 0)
+                {
+                    Log($"物理削除されたレコード: {purgedCount}件");
+                }
+                else
+                {
+                    Log("物理削除の必要なし");
+                }
+
+                int fixedCount;
+                using (var con = new SqliteConnection(Database.GetConnectionString()))
+                {
+                    con.Open();
+
+                    // busy_timeout を設定
+                    using (var cmd = con.CreateCommand())
+                    {
+                        cmd.CommandText = "PRAGMA busy_timeout = 10000;";
+                        cmd.ExecuteNonQuery();
+                    }
+
+                    fixedCount = FixInvalidData(con);
+                }
+
+                if (fixedCount > 0)
+                {
+                    Log($"修正されたレコード: {fixedCount}件");
+                }
+                else
+                {
+                    Log("✓ 不正なデータなし");
+                }
+                Log("");
+
+                Log("✓ データベース最適化完了");
                 Log("");
                 Log("=== データベース整合性チェック完了 ===");
-
-                // メッセージボックスで結果を表示
 
                 MessageBox.Show(
                     logBuilder.ToString(),
@@ -338,20 +435,6 @@ namespace StickyNoteApp
             return fixedCount;
         }
 
-        /// <summary>
-        /// データベースを最適化（VACUUM）
-        /// </summary>
-        private static void OptimizeDatabase(SqliteConnection con)
-        {
-            using (var cmd = new SqliteCommand("VACUUM", con))
-            {
-                cmd.ExecuteNonQuery();
-            }
-        }
-
-        /// <summary>
-        /// データベースの詳細レポートを生成
-        /// </summary>
         public static void GenerateReport()
         {
             logBuilder.Clear();
@@ -362,11 +445,11 @@ namespace StickyNoteApp
 
             try
             {
+                // レポート生成も都度接続
                 using (var con = new SqliteConnection(Database.GetConnectionString()))
                 {
                     con.Open();
 
-                    // 全レコードの情報を出力
                     string sql = "SELECT * FROM StickyNotes ORDER BY CreatedAt ASC";
                     using (var cmd = new SqliteCommand(sql, con))
                     using (var reader = cmd.ExecuteReader())
@@ -402,22 +485,17 @@ namespace StickyNoteApp
                             Log("有効な付箋はありません");
                         }
                     }
-                }
+                } // ← 接続を閉じる
 
                 Log("");
                 Log("=== レポート終了 ===");
 
-                Debug.WriteLine("レポート用メッセージボックスを表示します");
-
-                // メッセージボックスで結果を表示
                 MessageBox.Show(
                     logBuilder.ToString(),
                     "データベース詳細レポート",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information
                 );
-
-                Debug.WriteLine("レポート用メッセージボックスが閉じられました");
             }
             catch (Exception ex)
             {

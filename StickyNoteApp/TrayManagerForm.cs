@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
+using static StickyNoteApp.Database;
 
 namespace StickyNoteApp
 {
@@ -105,91 +106,91 @@ namespace StickyNoteApp
 
             try
             {
-                using (SqliteDataReader reader = Database.LoadAll())
+                // グローバル復元フラグを立てる（起動時は既にtrueだが念のため）
+                Common.BeginRestore();
+
+                // データベースから全データを一括取得（接続はすぐに閉じられる）
+                List<StickyNoteData> noteDataList = Database.LoadAll();
+
+                System.Diagnostics.Debug.WriteLine($"復元開始: {noteDataList.Count}件の付箋を処理します");
+
+                // 取得したデータを元に付箋を復元
+                foreach (var noteData in noteDataList)
                 {
-                    while (reader.Read())
+                    restoredCount++;
+
+                    StickyNoteForm note = new StickyNoteForm();
+
+                    // データベースから値を復元
+                    note.NoteId = noteData.Id;
+                    note.CreatedAt = noteData.CreatedAt;
+
+                    // 色を先に復元
+                    Color bgColor = Color.FromArgb(noteData.BgR, noteData.BgG, noteData.BgB);
+                    note.BackColor = bgColor;
+                    note.txtNote.BackColor = bgColor;
+
+                    // 位置とサイズを復元
+                    note.Location = new Point(noteData.PosX, noteData.PosY);
+                    note.Size = new Size(noteData.Width, noteData.Height);
+
+                    // TopMostを復元
+                    bool topMost = noteData.TopMostFlag == TOPMOST_FLAG_ENABLED;
+                    note.SetTopMost(topMost);
+
+                    // テキストを最後に復元
+                    note.SetText(noteData.Content);
+
+                    // 画像を復元 (noteData から取得)
+                    if (!string.IsNullOrEmpty(noteData.ImagePath))
                     {
-                        restoredCount++;
-
-                        string id = reader["Id"].ToString();
-                        string content = reader["Content"].ToString();
-                        int posX = Convert.ToInt32(reader["PosX"]);
-                        int posY = Convert.ToInt32(reader["PosY"]);
-
-                        // 付箋フォームを作成
-                        StickyNoteForm note = new StickyNoteForm();
-
-                        // 復元開始を通知（これでDB保存をスキップする）
-                        note.BeginRestore();
-
-                        try
-                        {
-                            // データベースから値を復元
-                            note.NoteId = id;
-                            note.CreatedAt = reader["CreatedAt"].ToString();
-
-                            // 色を先に復元
-                            Color bgColor = Color.FromArgb(
-                                Convert.ToInt32(reader["BgR"]),
-                                Convert.ToInt32(reader["BgG"]),
-                                Convert.ToInt32(reader["BgB"])
-                            );
-                            note.BackColor = bgColor;
-                            note.txtNote.BackColor = bgColor;
-
-                            // 位置とサイズを復元
-                            note.Location = new Point(posX, posY);
-                            note.Size = new Size(
-                                Convert.ToInt32(reader["Width"]),
-                                Convert.ToInt32(reader["Height"])
-                            );
-
-                            // TopMostを復元
-                            bool topMost = Convert.ToInt32(reader["TopMostFlag"]) == TOPMOST_FLAG_ENABLED;
-                            note.SetTopMost(topMost);
-
-                            // テキストを最後に復元
-                            note.SetText(content);
-
-                            // 画像を復元
-                            string imagePath = reader["ImagePath"]?.ToString();
-                            if (!string.IsNullOrEmpty(imagePath))
-                            {
-                                note.LoadCapturedImage(imagePath);
-                            }
-
-                            // リマインダー復元（ReminderManagerに委譲）
-                            if (note.GetReminderInfo() != null)
-                            {
-                                var reminderManager = note.GetReminderManager();
-                                if (reminderManager != null && reminderManager.RestoreReminderFromDatabase(id, content, reader))
-                                {
-                                    reminderRestoredCount++;
-                                }
-                            }
-                        }
-                        finally
-                        {
-                            // 復元終了を通知（各付箋ごとに実行）
-                            note.EndRestore();
-                        }
-
-                        allNotes.Add(note);
-
-                        // 付箋が閉じられたらリストから削除
-                        note.FormClosed += (s, e) =>
-                        {
-                            allNotes.Remove(note);
-                        };
-
-                        // 付箋を表示
-                        note.Show();
+                        note.LoadCapturedImage(noteData.ImagePath);
                     }
+
+                    // リマインダー復元
+                    if (noteData.ReminderActive == 1 && !string.IsNullOrEmpty(noteData.ReminderTime))
+                    {
+                        DateTime reminderTime;
+                        if (DateTime.TryParse(noteData.ReminderTime, out reminderTime))
+                        {
+                            if (reminderTime > DateTime.Now)
+                            {
+                                note.RestoreReminder(reminderTime);
+                                reminderRestoredCount++;
+                                System.Diagnostics.Debug.WriteLine($"リマインダー復元: {noteData.Id} - {reminderTime}");
+                            }
+                            else
+                            {
+                                System.Diagnostics.Debug.WriteLine($"リマインダー期限切れ: {noteData.Id} - {reminderTime}");
+                            }
+                        }
+                    }
+                    // 個別のEndRestore()は不要
+
+                    allNotes.Add(note);
+
+                    // 付箋が閉じられたらリストから削除
+                    note.FormClosed += (s, e) =>
+                    {
+                        allNotes.Remove(note);
+                    };
+
+                    // 付箋を表示
+                    note.Show();
                 }
+
+                System.Diagnostics.Debug.WriteLine($"付箋復元完了: {restoredCount}件, リマインダー復元: {reminderRestoredCount}件");
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"付箋の復元中にエラー:\n{ex.Message}", "エラー");
+                System.Diagnostics.Debug.WriteLine($"付箋復元エラー: {ex.Message}");
+                MessageBox.Show($"付箋の復元中にエラーが発生しました:\n{ex.Message}", "エラー",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                // 重要：すべての復元処理が完了したらグローバルフラグを下ろす
+                Common.EndRestore();
             }
         }
 
@@ -254,9 +255,9 @@ namespace StickyNoteApp
         {
             try
             {
-                // 確認ダイアログを表示
                 var result = MessageBox.Show(
                     "データベースの整合性チェックと修正を実行します。\n\n" +
+                    "実行中は付箋の保存が一時停止されます。\n\n" +
                     "実行しますか？",
                     "データベース整合性チェック",
                     MessageBoxButtons.YesNo,
@@ -265,21 +266,37 @@ namespace StickyNoteApp
 
                 if (result == DialogResult.Yes)
                 {
-                    // 整合性チェックと修正を実行
-                    DatabaseIntegrityChecker.CheckAndRepair();
+                    // 整合性チェック中は保存を停止
+                    bool wasRestoring = Common.IsRestoring;
+                    Common.BeginRestore();
 
-                    // 詳細レポートを表示するか確認
-                    var reportResult = MessageBox.Show(
-                        "整合性チェックが完了しました。\n\n" +
-                        "詳細レポートを表示しますか？",
-                        "完了",
-                        MessageBoxButtons.YesNo,
-                        MessageBoxIcon.Information
-                    );
-
-                    if (reportResult == DialogResult.Yes)
+                    try
                     {
-                        DatabaseIntegrityChecker.GenerateReport();
+                        // 整合性チェックと修正を実行
+                        DatabaseIntegrityChecker.CheckAndRepair();
+
+                        // 詳細レポートを表示するか確認
+                        var reportResult = MessageBox.Show(
+                            "整合性チェックが完了しました。\n\n" +
+                            "詳細レポートを表示しますか？",
+                            "完了",
+                            MessageBoxButtons.YesNo,
+                            MessageBoxIcon.Information
+                        );
+
+                        if (reportResult == DialogResult.Yes)
+                        {
+                            DatabaseIntegrityChecker.GenerateReport();
+                        }
+                    }
+                    finally
+                    {
+                        if (!wasRestoring)
+                        {
+                            // 保存を再開
+                            Common.EndRestore();
+                        }
+                        System.Diagnostics.Debug.WriteLine("[整合性チェック完了] 保存を再開しました");
                     }
                 }
             }

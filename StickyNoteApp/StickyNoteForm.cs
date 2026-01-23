@@ -113,8 +113,8 @@ namespace StickyNoteApp
         /// </summary>
         private void StickyNoteForm_Deactivate(object sender, EventArgs e)
         {
-            // 復元中は保存しない
-            if (isRestoring) return;
+            // グローバル復元フラグをチェック
+            if (Common.IsRestoring) return;
 
             SaveCurrentNoteState();
 
@@ -130,8 +130,8 @@ namespace StickyNoteApp
         /// </summary>
         private void BackColor_Changed(object sender, EventArgs e)
         {
-            // 復元中は保存しない
-            if (isRestoring) return;
+            // グローバル復元フラグをチェック
+            if (Common.IsRestoring) return;
 
             // 色変更完了時に保存
             SaveCurrentNoteState();
@@ -1049,30 +1049,7 @@ namespace StickyNoteApp
         /// </summary>
         public void SetText(string text)
         {
-            // 復元中フラグを立てる
-            isRestoring = true;
-
             txtNote.Text = text;
-
-            // 復元中フラグを下ろす
-            isRestoring = false;
-        }
-        // 新規メソッド追加
-
-        /// <summary>
-        /// 復元処理の開始を通知
-        /// </summary>
-        public void BeginRestore()
-        {
-            isRestoring = true;
-        }
-
-        /// <summary>
-        /// 復元処理の終了を通知
-        /// </summary>
-        public void EndRestore()
-        {
-            isRestoring = false;
         }
 
         /// <summary>
