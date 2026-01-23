@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
-using static StickyNoteApp.Database;
 
 namespace StickyNoteApp
 {
@@ -13,7 +12,6 @@ namespace StickyNoteApp
     public partial class TrayManagerForm : Form
     {
         // 定数定義
-
         private const int CURSOR_OFFSET = 50; // カーソル位置からの付箋作成オフセット
         private const int TOPMOST_FLAG_ENABLED = 1; // TopMostフラグが有効な場合の値
         private const int TRAY_BALLOON_TIP_DURATION = 2000; // トレイアイコンのバルーンチップ表示時間(ミリ秒)
@@ -66,7 +64,6 @@ namespace StickyNoteApp
             // DB整合性チェック（デバッグ用。完成間際で削除予定）
             TrayMenu.Items.Add(new ToolStripSeparator()); // 区切り線
             TrayMenu.Items.Add("データベース整合性チェック", null, OnDatabaseIntegrityCheckClicked);
-
 
             // 設定（未実装）
             TrayMenu.Items.Add("設定", null, OnSettingClicked);
@@ -141,10 +138,17 @@ namespace StickyNoteApp
                     // テキストを最後に復元
                     note.SetText(noteData.Content);
 
-                    // 画像を復元 (noteData から取得)
-                    if (!string.IsNullOrEmpty(noteData.ImagePath))
+                    // 画像を復元（3つのパスを渡す）
+                    if (!string.IsNullOrEmpty(noteData.ImagePath) ||
+                        !string.IsNullOrEmpty(noteData.OriginalImagePath) ||
+                        !string.IsNullOrEmpty(noteData.ResizedImagePath))
                     {
-                        note.LoadCapturedImage(noteData.ImagePath);
+                        note.LoadCapturedImage(
+                                noteData.ImagePath,
+                                noteData.OriginalImagePath,
+                                noteData.ResizedImagePath,
+                                noteData.ImageDisplayHeight
+                         );
                     }
 
                     // リマインダー復元
@@ -246,7 +250,6 @@ namespace StickyNoteApp
                 ToggleAllNotesMenuItem.Text = "すべての付箋を非表示";
             }
         }
-
 
         /// <summary>
         /// データベース整合性チェック
