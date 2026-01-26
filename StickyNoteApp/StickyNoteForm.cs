@@ -703,7 +703,8 @@ namespace StickyNoteApp
 
         /// <summary>
         /// 付箋に貼り付けた画像を削除する
-        /// （表示・ファイル・パス情報をまとめてクリアする）         /// </summary>
+        /// （表示・ファイル・パス情報をまとめてクリアする）
+        /// </summary>
         private void RemoveCapturedImage()
         {
             // 先に画像を解放（順序が重要）
@@ -718,8 +719,17 @@ namespace StickyNoteApp
             pictureBox.Visible = false;
 
             // ファイル削除（リトライ機能付き）
-            DeleteImageFileWithRetry(originalImagePath);
-            DeleteImageFileWithRetry(resizedImagePath);
+            try
+            {
+                DeleteImageFileWithRetry(originalImagePath);
+                DeleteImageFileWithRetry(resizedImagePath);
+            }
+            catch (Exception ex)
+            {
+                // ファイル削除失敗時もUI操作は続行する（画像は既に解放済み）
+                System.Diagnostics.Debug.WriteLine($"画像ファイル削除時にエラーが発生: {ex.GetType().Name}: {ex.Message}");
+                // ユーザーへの通知は不要（バックグラウンド処理のため）
+            }
 
             originalImagePath = null;
             resizedImagePath = null;
@@ -735,7 +745,7 @@ namespace StickyNoteApp
         /// <summary>
         /// 画像ファイルをリトライ付きで削除
         /// IOException（ファイル使用中などの一時的なエラー）のみ再試行対象とする。
-        /// IOException以外の例外は、リトライしても解決しないため意図的にキャッチせず、呼び出し元で処理する。
+        /// IOException以外の例外は、リトライしても解決しないため意図的にキャッチせず、呼び出し元（RemoveCapturedImage）で処理する。
         /// </summary>
         private void DeleteImageFileWithRetry(string filePath, int maxRetries = 3)
         {
