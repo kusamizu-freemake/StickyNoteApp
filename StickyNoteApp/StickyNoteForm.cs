@@ -734,6 +734,8 @@ namespace StickyNoteApp
 
         /// <summary>
         /// 画像ファイルをリトライ付きで削除
+        /// IOException（ファイル使用中などの一時的なエラー）のみ再試行対象とする。
+        /// IOException以外の例外は、リトライしても解決しないため意図的にキャッチせず、呼び出し元で処理する。
         /// </summary>
         private void DeleteImageFileWithRetry(string filePath, int maxRetries = 3)
         {
