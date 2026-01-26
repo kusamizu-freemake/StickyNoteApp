@@ -21,8 +21,6 @@ namespace StickyNoteApp
         private const int NEW_NOTE_OFFSET_Y = 30; // 新規付箋のY方向オフセット
 
         // 画像表示関連
-        private const int DEFAULT_IMAGE_HEIGHT = 150; // デフォルト画像表示高さ
-        private const int IMAGE_LEFT_MARGIN = 0; // 画像の左マージン
         private const int IMAGE_SIZE_SMALL = 100; // 画像サイズ：小
         private const int IMAGE_SIZE_MEDIUM = 150; // 画像サイズ：中
         private const int IMAGE_SIZE_LARGE = 200; // 画像サイズ：大
@@ -70,19 +68,15 @@ namespace StickyNoteApp
         // リマインダーマネージャー
         private ReminderManager reminderManager;
 
-        // 付箋に貼り付けた画像を表示するための PictureBox
-        // 画像パス管理（3つに分割）
+        // 画像管理
         private PictureBox pictureBox;
-        private string originalImagePath;      // 元画像のパス
-        private string resizedImagePath;       // リサイズ済み画像のパス
-        private int imageDisplayHeight = 150;  // 画像表示高さ
+        private ImageManager imageManager;
 
-
-        public string OriginalImagePath => originalImagePath; // 元画像のパス（データベース保存用）
-        public string ResizedImagePath => resizedImagePath; // リサイズ済み画像のパス（データベース保存用）
-        public int ImageDisplayHeight => imageDisplayHeight; // 画像表示高さ（データベース保存用）
-
-        public string CapturedImagePath => resizedImagePath ?? originalImagePath; // キャプチャ画像のパス（互換性のため残す。確認要）
+        // データベース保存用プロパティ（ImageManagerへの委譲）
+        public string OriginalImagePath => imageManager?.OriginalImagePath; // 元画像のパス（データベース保存用）
+        public string ResizedImagePath => imageManager?.ResizedImagePath; // リサイズ済み画像のパス（データベース保存用）
+        public int ImageDisplayHeight => imageManager?.ImageDisplayHeight ?? 150; // 画像表示高さ（データベース保存用）
+        public string CapturedImagePath => imageManager?.CapturedImagePath; // キャプチャ画像のパス（互換性のため残す。）
 
         public StickyNoteForm()
         {
@@ -91,6 +85,9 @@ namespace StickyNoteApp
             InitializeResizeHandlers();       // サイズ変更ハンドラーの初期化（リサイズ機能）
             InitializeReminder();             // リマインダー管理の初期化
             InitializePictureBox();           // 画像表示用のPictureBox初期化
+
+            // 画像マネージャーの初期化
+            imageManager = new ImageManager(this, pictureBox);
 
             // 最前面表示の初期状態を反映
             UpdateTopMostMenuState();
@@ -559,16 +556,16 @@ namespace StickyNoteApp
             var imageContextMenu = new ContextMenuStrip();
 
             var deleteImageItem = new ToolStripMenuItem("画像を削除");
-            deleteImageItem.Click += (s, e) => RemoveCapturedImage();
+            deleteImageItem.Click += (s, e) => imageManager?.RemoveImage();
             imageContextMenu.Items.Add(deleteImageItem);
             imageContextMenu.Items.Add(new ToolStripSeparator());
 
             var copyImageItem = new ToolStripMenuItem("画像をコピー");
-            copyImageItem.Click += CopyImage_Click;
+            copyImageItem.Click += (s, e) => imageManager?.CopyImage();
             imageContextMenu.Items.Add(copyImageItem);
 
             var saveImageAsItem = new ToolStripMenuItem("画像を名前を付けて保存");
-            saveImageAsItem.Click += SaveImageAs_Click;
+            saveImageAsItem.Click += (s, e) => imageManager?.SaveImageAs();
             imageContextMenu.Items.Add(saveImageAsItem);
 
             imageContextMenu.Items.Add(new ToolStripSeparator());
@@ -576,19 +573,19 @@ namespace StickyNoteApp
             var resizeImageItem = new ToolStripMenuItem("画像サイズ");
 
             var sizeSmallItem = new ToolStripMenuItem("小 (100px)");
-            sizeSmallItem.Click += (s, e) => ResizeImage(IMAGE_SIZE_SMALL);
+            sizeSmallItem.Click += (s, e) => imageManager?.ResizeImage(IMAGE_SIZE_SMALL);
             resizeImageItem.DropDownItems.Add(sizeSmallItem);
 
             var sizeMediumItem = new ToolStripMenuItem("中 (150px)");
-            sizeMediumItem.Click += (s, e) => ResizeImage(IMAGE_SIZE_MEDIUM);
+            sizeMediumItem.Click += (s, e) => imageManager?.ResizeImage(IMAGE_SIZE_MEDIUM);
             resizeImageItem.DropDownItems.Add(sizeMediumItem);
 
             var sizeLargeItem = new ToolStripMenuItem("大 (200px)");
-            sizeLargeItem.Click += (s, e) => ResizeImage(IMAGE_SIZE_LARGE);
+            sizeLargeItem.Click += (s, e) => imageManager?.ResizeImage(IMAGE_SIZE_LARGE);
             resizeImageItem.DropDownItems.Add(sizeLargeItem);
 
             var sizeExtraLargeItem = new ToolStripMenuItem("特大 (250px)");
-            sizeExtraLargeItem.Click += (s, e) => ResizeImage(IMAGE_SIZE_EXTRA_LARGE);
+            sizeExtraLargeItem.Click += (s, e) => imageManager?.ResizeImage(IMAGE_SIZE_EXTRA_LARGE);
             resizeImageItem.DropDownItems.Add(sizeExtraLargeItem);
 
             imageContextMenu.Items.Add(resizeImageItem);
@@ -601,87 +598,6 @@ namespace StickyNoteApp
             this.Controls.SetChildIndex(pictureBox, 0);
         }
 
-        /// <summary>
-        /// 画像をコピー
-        /// </summary>
-        private void CopyImage_Click(object sender, EventArgs e)
-        {
-            if (pictureBox.Image != null)
-            {
-                try
-                {
-                    Clipboard.SetImage(pictureBox.Image);
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"画像のコピーに失敗しました:\n{ex.Message}", "エラー",
-                        MessageBoxButtons.OK, MessageBoxIcon.Error);
-                }
-            }
-        }
-
-        /// <summary>
-        /// 画像を名前を付けて保存
-        /// </summary>
-        private void SaveImageAs_Click(object sender, EventArgs e)
-        {
-            if (pictureBox.Image != null)
-            {
-                try
-                {
-                    using (var saveDialog = new SaveFileDialog())
-                    {
-                        saveDialog.Filter = "PNG画像|*.png|JPEG画像|*.jpg|BMP画像|*.bmp|すべてのファイル|*.*";
-                        saveDialog.DefaultExt = "png";
-                        saveDialog.FileName = $"capture_{DateTime.Now:yyyyMMdd_HHmmss}.png";
-
-                        if (saveDialog.ShowDialog() == DialogResult.OK)
-                        {
-                            var format = System.Drawing.Imaging.ImageFormat.Png;
-                            string ext = System.IO.Path.GetExtension(saveDialog.FileName).ToLower();
-                            switch (ext)
-                            {
-                                case ".jpg":
-                                case ".jpeg":
-                                    format = System.Drawing.Imaging.ImageFormat.Jpeg;
-                                    break;
-                                case ".bmp":
-                                    format = System.Drawing.Imaging.ImageFormat.Bmp;
-                                    break;
-                            }
-
-                            pictureBox.Image.Save(saveDialog.FileName, format);
-                            MessageBox.Show($"画像を保存しました:\n{saveDialog.FileName}", "保存完了",
-                                MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"画像の保存に失敗しました:\n{ex.Message}", "エラー",
-                        MessageBoxButtons.OK, MessageBoxIcon.Error);
-                }
-            }
-        }
-
-        /// <summary>
-        /// 画像サイズを変更
-        /// </summary>
-        private void ResizeImage(int height)
-        {
-            if (pictureBox.Visible)
-            {
-                pictureBox.Height = height;
-                imageDisplayHeight = height; // 高さを記録
-
-                // テキストボックスの位置を調整
-                txtNote.Top = pictureBox.Bottom;
-                txtNote.Height = this.ClientSize.Height - txtNote.Top;
-
-                // 画像サイズ変更完了時に保存
-                SaveCurrentNoteState();
-            }
-        }
 
         /// <summary>
         /// PictureBoxダブルクリック時の処理（画像削除）
@@ -697,84 +613,10 @@ namespace StickyNoteApp
 
             if (result == DialogResult.Yes)
             {
-                RemoveCapturedImage();
+                imageManager?.RemoveImage();
             }
         }
 
-        /// <summary>
-        /// 付箋に貼り付けた画像を削除する
-        /// （表示・ファイル・パス情報をまとめてクリアする）
-        /// </summary>
-        private void RemoveCapturedImage()
-        {
-            // 先に画像を解放（順序が重要）
-            if (pictureBox.Image != null)
-            {
-                var image = pictureBox.Image;
-                pictureBox.Image = null; // 先にnullを設定してロックを解除
-                image.Dispose(); // その後dispose
-            }
-
-            pictureBox.Height = 0;
-            pictureBox.Visible = false;
-
-            // ファイル削除（リトライ機能付き）
-            try
-            {
-                DeleteImageFileWithRetry(originalImagePath);
-                DeleteImageFileWithRetry(resizedImagePath);
-            }
-            catch (Exception ex)
-            {
-                // ファイル削除失敗時もUI操作は続行する（画像は既に解放済み）
-                System.Diagnostics.Debug.WriteLine($"画像ファイル削除時にエラーが発生: {ex.GetType().Name}: {ex.Message}");
-                // ユーザーへの通知は不要（バックグラウンド処理のため）
-            }
-
-            originalImagePath = null;
-            resizedImagePath = null;
-            imageDisplayHeight = 150; // デフォルトに戻す
-
-            // テキストボックスの位置を調整
-            txtNote.Dock = DockStyle.Fill;
-
-            // 画像削除完了時に保存
-            SaveCurrentNoteState();
-        }
-
-        /// <summary>
-        /// 画像ファイルをリトライ付きで削除
-        /// IOException（ファイル使用中などの一時的なエラー）のみ再試行対象とする。
-        /// IOException以外の例外は、リトライしても解決しないため意図的にキャッチせず、呼び出し元（RemoveCapturedImage）で処理する。
-        /// </summary>
-        private void DeleteImageFileWithRetry(string filePath, int maxRetries = 3)
-        {
-            if (string.IsNullOrEmpty(filePath) || !System.IO.File.Exists(filePath))
-                return;
-
-            for (int i = 0; i < maxRetries; i++)
-            {
-                try
-                {
-                    System.IO.File.Delete(filePath);
-                    System.Diagnostics.Debug.WriteLine($"画像削除成功: {filePath}");
-                    return; // 成功したら終了
-                }
-                catch (System.IO.IOException ex)
-                {
-                    if (i < maxRetries - 1)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"画像削除リトライ {i + 1}/{maxRetries}: {filePath}");
-                        System.Threading.Thread.Sleep(100); // 100ms待機
-                    }
-                    else
-                    {
-                        System.Diagnostics.Debug.WriteLine($"画像削除失敗（最終リトライ）: {filePath} - {ex.Message}");
-                        // 最終的に失敗してもアプリは続行
-                    }
-                }
-            }
-        }
 
         /// <summary>
         /// タイトルバーのマウスダウン
@@ -945,82 +787,9 @@ namespace StickyNoteApp
         /// </summary>
         private void PasteImageMenuItem_Click(object sender, EventArgs e)
         {
-            try
-            {
-                if (Clipboard.ContainsImage())
-                {
-                    Image clipboardImage = Clipboard.GetImage();
-
-                    if (clipboardImage != null)
-                    {
-                        // 既存の画像を削除
-                        if (pictureBox.Image != null)
-                        {
-                            pictureBox.Image.Dispose();
-                        }
-
-                        // Bitmapに変換
-                        Bitmap bitmap = new Bitmap(clipboardImage);
-
-                        // 元画像として保存
-                        string imagePath = SaveOriginalImage(bitmap);
-                        originalImagePath = imagePath;
-                        resizedImagePath = null; // クリップボードからはリサイズなし
-
-                        // PictureBoxに表示
-                        pictureBox.Image = bitmap;
-                        pictureBox.Height = DEFAULT_IMAGE_HEIGHT;
-                        pictureBox.Visible = true;
-                        imageDisplayHeight = DEFAULT_IMAGE_HEIGHT;
-
-                        // テキストボックスの位置を調整
-                        txtNote.Dock = DockStyle.None;
-                        txtNote.Top = pictureBox.Bottom;
-                        txtNote.Left = IMAGE_LEFT_MARGIN;
-                        txtNote.Width = this.ClientSize.Width;
-                        txtNote.Height = this.ClientSize.Height - txtNote.Top;
-
-                        // 画像貼り付け完了時に保存
-                        SaveCurrentNoteState();
-                    }
-                }
-                else
-                {
-                    MessageBox.Show("クリップボードに画像がありません。", "情報",
-                        MessageBoxButtons.OK, MessageBoxIcon.Information);
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"画像の貼り付けに失敗しました:\n{ex.Message}", "エラー",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
+            imageManager?.PasteImageFromClipboard();
         }
 
-
-        /// <summary>
-        /// 付箋に貼り付けた画像をファイルとして保存する
-        /// </summary>
-        private string SaveOriginalImage(Bitmap image)
-        {
-            string folder = System.IO.Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "StickyNoteApp",
-                "Images"
-            );
-
-            if (!System.IO.Directory.Exists(folder))
-            {
-                System.IO.Directory.CreateDirectory(folder);
-            }
-
-            string fileName = $"{NoteId}_original_{DateTime.Now:yyyyMMddHHmmss}.png";
-            string filePath = System.IO.Path.Combine(folder, fileName);
-
-            image.Save(filePath, System.Drawing.Imaging.ImageFormat.Png);
-
-            return filePath;
-        }
 
         /// <summary>
         /// 画像を復元（データベースから読み込み時用）
@@ -1028,49 +797,7 @@ namespace StickyNoteApp
         /// </summary>
         public void LoadCapturedImage(string imagePath, string originalPath, string resizedPath, int displayHeight)
         {
-            try
-            {
-                // 3つのパラメータを設定
-                originalImagePath = originalPath;
-                resizedImagePath = resizedPath;
-                imageDisplayHeight = displayHeight > 0 ? displayHeight : DEFAULT_IMAGE_HEIGHT;
-
-                // 表示する画像を決定（リサイズ済み → 元画像 → 旧ImagePath の優先順）
-                string imageToLoad = null;
-                if (!string.IsNullOrEmpty(resizedPath) && System.IO.File.Exists(resizedPath))
-                {
-                    imageToLoad = resizedPath;
-                }
-                else if (!string.IsNullOrEmpty(originalPath) && System.IO.File.Exists(originalPath))
-                {
-                    imageToLoad = originalPath;
-                }
-                else if (!string.IsNullOrEmpty(imagePath) && System.IO.File.Exists(imagePath))
-                {
-                    // 互換性のため旧ImagePathもチェック
-                    imageToLoad = imagePath;
-                    originalImagePath = imagePath; // 旧データは元画像として扱う
-                }
-
-                if (!string.IsNullOrEmpty(imageToLoad))
-                {
-                    pictureBox.Image = Image.FromFile(imageToLoad);
-                    pictureBox.Height = imageDisplayHeight;
-                    pictureBox.Visible = true;
-
-                    // テキストボックスの位置を調整
-                    txtNote.Dock = DockStyle.None;
-                    txtNote.Top = pictureBox.Bottom;
-                    txtNote.Left = IMAGE_LEFT_MARGIN;
-                    txtNote.Width = this.ClientSize.Width;
-                    txtNote.Height = this.ClientSize.Height - txtNote.Top;
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"画像読み込みエラー: {ex.Message}");
-                // 画像読み込み失敗時は画像なしの状態で続行
-            }
+            imageManager?.LoadImage(imagePath, originalPath, resizedPath, displayHeight);
         }
 
         /// <summary>
@@ -1146,12 +873,10 @@ namespace StickyNoteApp
                 reminderManager = null;
             }
 
-            // 画像のリソースを解放（順序変更）
-            if (pictureBox != null && pictureBox.Image != null)
+            // 画像マネージャーのリソースを解放
+            if (imageManager != null)
             {
-                var image = pictureBox.Image;
-                pictureBox.Image = null; // 先にnullを設定
-                image.Dispose(); // その後dispose
+                imageManager.Dispose();
             }
 
             // フォームクローズ時に最終保存
