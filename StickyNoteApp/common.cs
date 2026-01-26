@@ -17,6 +17,7 @@ namespace StickyNoteApp
         // 画像データ移行中かどうか
         public static bool IsImageMigrating { get; private set; } = false;
 
+        // データベース保存が可能な状態かどうか
         public static bool CanSaveDatabase =>
             IsSaveEnabled && !IsImageMigrating;
 
@@ -39,5 +40,35 @@ namespace StickyNoteApp
             // ここではまだ保存を有効にしない
             System.Diagnostics.Debug.WriteLine("[Common] 復元処理完了（保存はまだ無効）");
         }
+
+        /// <summary>
+        /// データベース保存を有効化
+        /// </summary>
+        public static void EnableSave()
+        {
+            IsSaveEnabled = true;
+            System.Diagnostics.Debug.WriteLine("[Common] データベース保存を有効化");
+        }
+
+        /// <summary>
+        /// 画像データ移行処理の開始を記録
+        /// </summary>
+        public static void BeginImageMigration()
+        {
+            IsImageMigrating = true;
+            IsSaveEnabled = false;
+            Debug.WriteLine("[Common] 画像データ移行開始");
+        }
+
+        /// <summary>
+        /// 画像データ移行処理の完了を記録
+        /// </summary>
+        public static void EndImageMigration()
+        {
+            IsImageMigrating = false;
+            IsSaveEnabled = true;
+            Debug.WriteLine("[Common] 画像データ移行完了");
+        }
+
     }
 }
