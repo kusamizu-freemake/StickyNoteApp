@@ -37,62 +37,81 @@ namespace StickyNoteApp
             pictureBox = picBox;
         }
 
+
         /// <summary>
-        /// クリップボードから画像を貼り付け
+        /// ファイルから画像を選択して読み込み
         /// </summary>
-        public void PasteImageFromClipboard()
+        public void SelectAndLoadImageFromFile()
         {
             try
             {
-                if (Clipboard.ContainsImage())
+                using (var openDialog = new OpenFileDialog())
                 {
-                    Image clipboardImage = Clipboard.GetImage();
+                    openDialog.Filter = "画像ファイル|*.png;*.jpg;*.jpeg;*.gif|" +
+                                       "PNGファイル|*.png|" +
+                                       "JPEGファイル|*.jpg;*.jpeg|" +
+                                       "GIFファイル|*.gif|" +
+                                       "すべてのファイル|*.*";
+                    openDialog.Title = "画像を選択";
+                    openDialog.Multiselect = false;
 
-                    if (clipboardImage != null)
+                    if (openDialog.ShowDialog() == DialogResult.OK)
                     {
-                        // 既存の画像を削除
-                        if (pictureBox.Image != null)
+                        // 画像を読み込み
+                        using (var originalImage = Image.FromFile(openDialog.FileName))
                         {
-                            pictureBox.Image.Dispose();
+                            // Bitmapに変換してコピー
+                            Bitmap bitmap = new Bitmap(originalImage);
+
+                            // 既存の画像を削除
+                            RemoveImageInternal();
+
+                            // 元画像として保存
+                            string imagePath = SaveOriginalImage(bitmap);
+                            originalImagePath = imagePath;
+                            resizedImagePath = null;
+
+                            // PictureBoxに表示
+                            pictureBox.Image = bitmap;
+                            pictureBox.Height = DEFAULT_IMAGE_HEIGHT;
+                            pictureBox.Visible = true;
+                            imageDisplayHeight = DEFAULT_IMAGE_HEIGHT;
+
+                            // テキストボックスの位置を調整
+                            AdjustTextBoxPosition();
+
+                            // 画像読み込み完了時に保存
+                            parentForm.SaveCurrentNoteState();
+
+                            MessageBox.Show(
+                                "画像を読み込みました。",
+                                "完了",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Information);
                         }
-
-                        // Bitmapに変換
-                        Bitmap bitmap = new Bitmap(clipboardImage);
-
-                        // 元画像として保存
-                        string imagePath = SaveOriginalImage(bitmap);
-                        originalImagePath = imagePath;
-                        resizedImagePath = null;
-
-                        // PictureBoxに表示
-                        pictureBox.Image = bitmap;
-                        pictureBox.Height = DEFAULT_IMAGE_HEIGHT;
-                        pictureBox.Visible = true;
-                        imageDisplayHeight = DEFAULT_IMAGE_HEIGHT;
-
-                        // テキストボックスの位置を調整
-                        AdjustTextBoxPosition();
-
-                        // 画像貼り付け完了時に保存
-                        parentForm.SaveCurrentNoteState();
                     }
-                }
-                else
-                {
-                    MessageBox.Show(
-                        "クリップボードに画像がありません。",
-                        "情報",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Information);
                 }
             }
             catch (Exception ex)
             {
                 MessageBox.Show(
-                    $"画像の貼り付けに失敗しました:\n{ex.Message}",
+                    $"画像の読み込みに失敗しました:\n{ex.Message}",
                     "エラー",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>
+        /// メッセージボックスを表示せずに画像を削除
+        /// </summary>
+        private void RemoveImageInternal()
+        {
+            if (pictureBox.Image != null)
+            {
+                var Image = pictureBox.Image;
+                pictureBox.Image = null;
+                Image.Dispose();
             }
         }
 
@@ -129,7 +148,7 @@ namespace StickyNoteApp
                 {
                     using (var saveDialog = new SaveFileDialog())
                     {
-                        saveDialog.Filter = "PNG画像|*.png|JPEG画像|*.jpg|BMP画像|*.bmp|すべてのファイル|*.*";
+                        saveDialog.Filter = "PNG画像|*.png|JPEG画像|*.jpg|すべてのファイル|*.*";
                         saveDialog.DefaultExt = "png";
                         saveDialog.FileName = $"capture_{DateTime.Now:yyyyMMdd_HHmmss}.png";
 
@@ -142,9 +161,6 @@ namespace StickyNoteApp
                                 case ".jpg":
                                 case ".jpeg":
                                     format = System.Drawing.Imaging.ImageFormat.Jpeg;
-                                    break;
-                                case ".bmp":
-                                    format = System.Drawing.Imaging.ImageFormat.Bmp;
                                     break;
                             }
 
