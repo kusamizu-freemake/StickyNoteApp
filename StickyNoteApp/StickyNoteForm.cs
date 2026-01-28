@@ -555,23 +555,34 @@ namespace StickyNoteApp
             // 右クリックメニューを追加
             var imageContextMenu = new ContextMenuStrip();
 
+            // 画像を挿入
+            var insertImageItem = new ToolStripMenuItem("画像を挿入");
+            insertImageItem.Click += (s, e) => imageManager?.SelectAndLoadImageFromFile();
+            imageContextMenu.Items.Add(insertImageItem);
+            imageContextMenu.Items.Add(new ToolStripSeparator()); // 区切り線
+
+            // 画像を削除
             var deleteImageItem = new ToolStripMenuItem("画像を削除");
             deleteImageItem.Click += (s, e) => imageManager?.RemoveImage();
             imageContextMenu.Items.Add(deleteImageItem);
             imageContextMenu.Items.Add(new ToolStripSeparator());
 
+            // 画像をコピー
             var copyImageItem = new ToolStripMenuItem("画像をコピー");
             copyImageItem.Click += (s, e) => imageManager?.CopyImage();
             imageContextMenu.Items.Add(copyImageItem);
 
+            // 画像を名前を付けて保存
             var saveImageAsItem = new ToolStripMenuItem("画像を名前を付けて保存");
             saveImageAsItem.Click += (s, e) => imageManager?.SaveImageAs();
             imageContextMenu.Items.Add(saveImageAsItem);
 
             imageContextMenu.Items.Add(new ToolStripSeparator());
 
+            // 画像サイズ変更サブメニュー
             var resizeImageItem = new ToolStripMenuItem("画像サイズ");
-
+            
+            // サイズオプション
             var sizeSmallItem = new ToolStripMenuItem("小 (100px)");
             sizeSmallItem.Click += (s, e) => imageManager?.ResizeImage(IMAGE_SIZE_SMALL);
             resizeImageItem.DropDownItems.Add(sizeSmallItem);
@@ -783,11 +794,11 @@ namespace StickyNoteApp
 
 
         /// <summary>
-        /// クリップボードから画像を貼り付け
+        /// 画像を挿入（ファイル選択ダイアログ）
         /// </summary>
         private void PasteImageMenuItem_Click(object sender, EventArgs e)
         {
-            imageManager?.PasteImageFromClipboard();
+            imageManager?.SelectAndLoadImageFromFile();
         }
 
 

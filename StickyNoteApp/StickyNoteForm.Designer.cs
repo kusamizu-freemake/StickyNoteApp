@@ -150,8 +150,8 @@ namespace StickyNoteApp
             this.colorPurpleMenuItem.Click += new System.EventHandler(this.SelectColor_Purple_Click);
 
 
-            // クリップボードから画像を貼り付け
-            this.pasteImageMenuItem.Text = "クリップボードから画像を貼り付け";
+            // 画像を挿入
+            this.pasteImageMenuItem.Text = "画像を挿入";
             this.pasteImageMenuItem.Click += new System.EventHandler(this.PasteImageMenuItem_Click);
 
             // リマインダー（サブメニュー）
