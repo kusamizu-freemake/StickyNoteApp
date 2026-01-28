@@ -148,8 +148,7 @@ namespace StickyNoteApp
                 {
                     using (var saveDialog = new SaveFileDialog())
                     {
-                        // GIF形式は透過や品質の問題があるため、保存形式から除外
-                        saveDialog.Filter = "PNG画像|*.png|JPEG画像|*.jpg|すべてのファイル|*.*";
+                        saveDialog.Filter = "PNG画像|*.png|JPEG画像|*.jpg|GIF画像|*.gif|すべてのファイル|*.*";
                         saveDialog.DefaultExt = "png";
                         saveDialog.FileName = $"capture_{DateTime.Now:yyyyMMdd_HHmmss}.png";
 
@@ -162,6 +161,9 @@ namespace StickyNoteApp
                                 case ".jpg":
                                 case ".jpeg":
                                     format = System.Drawing.Imaging.ImageFormat.Jpeg;
+                                    break;
+                                case ".gif":
+                                    format = System.Drawing.Imaging.ImageFormat.Gif;
                                     break;
                             }
 
