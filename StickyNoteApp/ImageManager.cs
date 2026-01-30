@@ -14,6 +14,7 @@ namespace StickyNoteApp
         // 定数定義
         private const int DEFAULT_IMAGE_HEIGHT = 150;
         private const int IMAGE_LEFT_MARGIN = 0;
+        private const long MAX_FILE_SIZE_BYTES = 2 * 1024 * 1024; // 2MB
 
         private readonly StickyNoteForm parentForm;
         private readonly PictureBox pictureBox;
@@ -57,6 +58,23 @@ namespace StickyNoteApp
 
                     if (openDialog.ShowDialog() == DialogResult.OK)
                     {
+                        // ファイルサイズをチェック
+                        FileInfo fileInfo = new FileInfo(openDialog.FileName);
+                        if (fileInfo.Length > MAX_FILE_SIZE_BYTES)
+                        {
+                            double fileSizeMB = fileInfo.Length / (1024.0 * 1024.0);
+                            // サイズ超過の警告(小数点以下2桁まで表示 )
+                            MessageBox.Show(
+                                $"選択した画像ファイルのサイズが大きすぎます。\n" +
+                                $"ファイルサイズ: {fileSizeMB:F2}MB\n" +
+                                $"最大サイズ: 2MB\n\n" +
+                                $"2MB以下の画像ファイルを選択してください。",
+                                "ファイルサイズエラー",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Warning);
+                            return;
+                        }
+
                         // 画像を読み込み
                         using (var originalImage = Image.FromFile(openDialog.FileName))
                         {
