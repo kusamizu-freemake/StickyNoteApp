@@ -14,10 +14,10 @@ namespace StickyNoteApp
         // 定数定義
         private const int DEFAULT_IMAGE_HEIGHT = 150;
         private const int IMAGE_LEFT_MARGIN = 0;
-        
+
         private readonly StickyNoteForm parentForm;
         private readonly PictureBox pictureBox;
-        
+
         // 画像パス管理
         private string originalImagePath;      // 元画像のパス
         private string resizedImagePath;       // リサイズ済み画像のパス
@@ -67,12 +67,12 @@ namespace StickyNoteApp
                             RemoveImageInternal();
 
                             // 元画像として保存
-                            string imagePath = SaveOriginalImage(bitmap);
+                            string imagePath = SaveOriginalImage(bitmap, openDialog.FileName);
                             originalImagePath = imagePath;
                             resizedImagePath = null;
 
                             // PictureBoxに表示
-                            pictureBox.Image = bitmap;
+                            LoadImageToPictureBox(imagePath);
                             pictureBox.Height = DEFAULT_IMAGE_HEIGHT;
                             pictureBox.Visible = true;
                             imageDisplayHeight = DEFAULT_IMAGE_HEIGHT;
@@ -109,6 +109,9 @@ namespace StickyNoteApp
         {
             if (pictureBox.Image != null)
             {
+                // アニメーションを停止
+                ImageAnimator.StopAnimate(pictureBox.Image, OnFrameChanged);
+
                 var Image = pictureBox.Image;
                 pictureBox.Image = null;
                 Image.Dispose();
@@ -148,8 +151,7 @@ namespace StickyNoteApp
                 {
                     using (var saveDialog = new SaveFileDialog())
                     {
-                        // GIF形式は透過や品質の問題があるため、保存形式から除外
-                        saveDialog.Filter = "PNG画像|*.png|JPEG画像|*.jpg|すべてのファイル|*.*";
+                        saveDialog.Filter = "PNG画像|*.png|JPEG画像|*.jpg|GIF画像|*.gif|すべてのファイル|*.*";
                         saveDialog.DefaultExt = "png";
                         saveDialog.FileName = $"capture_{DateTime.Now:yyyyMMdd_HHmmss}.png";
 
@@ -163,9 +165,21 @@ namespace StickyNoteApp
                                 case ".jpeg":
                                     format = System.Drawing.Imaging.ImageFormat.Jpeg;
                                     break;
+                                case ".gif":
+                                    format = System.Drawing.Imaging.ImageFormat.Gif;
+                                    break;
                             }
 
-                            pictureBox.Image.Save(saveDialog.FileName, format);
+                            // アニメーションGIFの場合は元ファイルをコピー
+                            if (ext == ".gif" && IsAnimatedGif(pictureBox.Image) && !string.IsNullOrEmpty(originalImagePath) && File.Exists(originalImagePath))
+                            {
+                                File.Copy(originalImagePath, saveDialog.FileName, true);
+                            }
+                            else
+                            {
+                                pictureBox.Image.Save(saveDialog.FileName, format);
+                            }
+
                             MessageBox.Show(
                                 $"画像を保存しました:\n{saveDialog.FileName}",
                                 "保存完了",
@@ -211,6 +225,9 @@ namespace StickyNoteApp
             // 先に画像を解放（順序が重要）
             if (pictureBox.Image != null)
             {
+                // アニメーションを停止
+                ImageAnimator.StopAnimate(pictureBox.Image, OnFrameChanged);
+
                 var image = pictureBox.Image;
                 pictureBox.Image = null;
                 image.Dispose();
@@ -270,7 +287,8 @@ namespace StickyNoteApp
 
                 if (!string.IsNullOrEmpty(imageToLoad))
                 {
-                    pictureBox.Image = Image.FromFile(imageToLoad);
+                    // 自動的にアニメーションが開始
+                    LoadImageToPictureBox(imageToLoad);
                     pictureBox.Height = imageDisplayHeight;
                     pictureBox.Visible = true;
 
@@ -287,7 +305,7 @@ namespace StickyNoteApp
         /// <summary>
         /// 元画像をファイルとして保存
         /// </summary>
-        private string SaveOriginalImage(Bitmap image)
+        private string SaveOriginalImage(Bitmap image, string sourceFilePath)
         {
             string folder = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -300,12 +318,84 @@ namespace StickyNoteApp
                 Directory.CreateDirectory(folder);
             }
 
-            string fileName = $"{parentForm.NoteId}_original_{DateTime.Now:yyyyMMddHHmmss}.png";
+            // ファイル拡張子を取得（GIFの場合はGIFで保存）
+            string sourceExt = Path.GetExtension(sourceFilePath).ToLower();
+            string ext = (sourceExt == ".gif") ? ".gif" : ".png";
+
+            string fileName = $"{parentForm.NoteId}_original_{DateTime.Now:yyyyMMddHHmmss}{ext}";
             string filePath = Path.Combine(folder, fileName);
 
-            image.Save(filePath, System.Drawing.Imaging.ImageFormat.Png);
+            // GIFの場合は元ファイルをコピー（アニメーション情報を保持）
+            if (sourceExt == ".gif")
+            {
+                File.Copy(sourceFilePath, filePath, true);
+            }
+            else
+            {
+                image.Save(filePath, System.Drawing.Imaging.ImageFormat.Png);
+            }
 
             return filePath;
+        }
+
+        /// <summary>
+        /// PictureBoxに画像を読み込み、アニメーションGIFに対応
+        /// </summary>
+        private void LoadImageToPictureBox(string imagePath)
+        {
+            // 既存の画像のアニメーションを停止
+            if (pictureBox.Image != null)
+            {
+                ImageAnimator.StopAnimate(pictureBox.Image, OnFrameChanged);
+                pictureBox.Image.Dispose();
+            }
+
+            // 新しい画像を読み込み
+            pictureBox.Image = Image.FromFile(imagePath);
+
+            // アニメーションGIFの場合はアニメーションを開始
+            if (IsAnimatedGif(pictureBox.Image))
+            {
+                ImageAnimator.Animate(pictureBox.Image, OnFrameChanged);
+            }
+        }
+
+        /// <summary>
+        /// アニメーションGIFかどうかを判定
+        /// </summary>
+        private bool IsAnimatedGif(Image image)
+        {
+            if (image == null)
+                return false;
+
+            // GIF形式の番号と一致するか確認
+            // 静止画GIFはフレーム数が1, アニメーションGIFはフレーム数が2以上
+            if (image.RawFormat.Guid == System.Drawing.Imaging.ImageFormat.Gif.Guid)
+            {
+                var dimension = new System.Drawing.Imaging.FrameDimension(image.FrameDimensionsList[0]);
+                int frameCount = image.GetFrameCount(dimension);
+                return frameCount > 1;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// アニメーションフレーム更新時のコールバック
+        /// </summary>
+        private void OnFrameChanged(object sender, EventArgs e)
+        {
+            if (pictureBox.InvokeRequired)
+            {
+                // UIスレッドで実行
+                pictureBox.BeginInvoke(new EventHandler(OnFrameChanged), sender, e);
+            }
+            else
+            {
+                // フレームを更新して再描画
+                ImageAnimator.UpdateFrames(pictureBox.Image);
+                //
+                pictureBox.Invalidate();
+            }
         }
 
         /// <summary>
@@ -358,6 +448,9 @@ namespace StickyNoteApp
         {
             if (pictureBox != null && pictureBox.Image != null)
             {
+                // アニメーションを停止
+                ImageAnimator.StopAnimate(pictureBox.Image, OnFrameChanged);
+
                 var image = pictureBox.Image;
                 pictureBox.Image = null;
                 image.Dispose();
