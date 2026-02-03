@@ -561,27 +561,20 @@ namespace StickyNoteApp
             imageContextMenu.Items.Add(insertImageItem);
             imageContextMenu.Items.Add(new ToolStripSeparator()); // 区切り線
 
+            // 画像を編集（再登録）
+            var editImageItem = new ToolStripMenuItem("画像を編集");
+            editImageItem.Click += (s, e) => imageManager?.SelectAndLoadImageFromFile();
+            imageContextMenu.Items.Add(editImageItem);
+            imageContextMenu.Items.Add(new ToolStripSeparator()); // 区切り線
+
             // 画像を削除
             var deleteImageItem = new ToolStripMenuItem("画像を削除");
             deleteImageItem.Click += (s, e) => imageManager?.RemoveImage();
             imageContextMenu.Items.Add(deleteImageItem);
-            imageContextMenu.Items.Add(new ToolStripSeparator());
-
-            // 画像をコピー
-            var copyImageItem = new ToolStripMenuItem("画像をコピー");
-            copyImageItem.Click += (s, e) => imageManager?.CopyImage();
-            imageContextMenu.Items.Add(copyImageItem);
-
-            // 画像を名前を付けて保存
-            var saveImageAsItem = new ToolStripMenuItem("画像を名前を付けて保存");
-            saveImageAsItem.Click += (s, e) => imageManager?.SaveImageAs();
-            imageContextMenu.Items.Add(saveImageAsItem);
-
-            imageContextMenu.Items.Add(new ToolStripSeparator());
 
             // 画像サイズ変更サブメニュー
             var resizeImageItem = new ToolStripMenuItem("画像サイズ");
-            
+
             // サイズオプション
             var sizeSmallItem = new ToolStripMenuItem("小 (100px)");
             sizeSmallItem.Click += (s, e) => imageManager?.ResizeImage(IMAGE_SIZE_SMALL);
@@ -792,6 +785,22 @@ namespace StickyNoteApp
             ChangeColor(Color.Plum);
         }
 
+        /// <summary>
+        /// 右クリックメニューが開く前に、画像の有無に応じてメニュー項目を表示/非表示
+        /// </summary>
+        private void ContextMenu_Opening(object sender, System.ComponentModel.CancelEventArgs e)
+        {
+            // 画像があるかどうかをチェック
+            bool hasImage = pictureBox != null && pictureBox.Image != null;
+
+            // 画像がある時だけ表示するメニュー項目
+            editImageMenuItem.Visible = hasImage;
+            removeImageMenuItem.Visible = hasImage;
+            imageSizeMenuItem.Visible = hasImage;
+
+            // 画像がない時だけ表示するメニュー項目
+            pasteImageMenuItem.Visible = !hasImage;
+        }
 
         /// <summary>
         /// 画像を挿入（ファイル選択ダイアログ）
@@ -801,6 +810,70 @@ namespace StickyNoteApp
             imageManager?.SelectAndLoadImageFromFile();
         }
 
+        /// <summary>
+        /// 画像を編集（画像を再選択して貼り換える）
+        /// </summary>
+        private void EditImageMenuItem_Click(object sender, EventArgs e)
+        {
+            // ImageManagerの既存メソッドを呼び出すだけでOK
+            // このメソッドは内部で「古い画像を削除→新しい画像を保存」を自動実行
+            imageManager?.SelectAndLoadImageFromFile();
+        }
+
+        /// <summary>
+        /// 画像を削除
+        /// </summary>
+        private void RemoveImageMenuItem_Click(object sender, EventArgs e)
+        {
+            if (pictureBox?.Image != null)
+            {
+                // 確認メッセージを表示
+                var result = MessageBox.Show(
+                    "画像を削除しますか？",
+                    "確認",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question
+                );
+
+                if (result == DialogResult.Yes)
+                {
+                    // ImageManagerの削除メソッドを呼び出し
+                    imageManager?.RemoveImage();
+                }
+            }
+        }
+
+        /// <summary>
+        /// 画像サイズ変更：小
+        /// </summary>
+        private void ImageSmallMenuItem_Click(object sender, EventArgs e)
+        {
+            imageManager?.ResizeImage(IMAGE_SIZE_SMALL);
+        }
+
+        /// <summary>
+        /// 画像サイズ変更：中
+        /// </summary>
+        private void ImageMediumMenuItem_Click(object sender, EventArgs e)
+        {
+            imageManager?.ResizeImage(IMAGE_SIZE_MEDIUM);
+        }
+
+        /// <summary>
+        /// 画像サイズ変更：大
+        /// </summary>
+        private void ImageLargeMenuItem_Click(object sender, EventArgs e)
+        {
+            imageManager?.ResizeImage(IMAGE_SIZE_LARGE);
+        }
+
+        /// <summary>
+        /// 画像サイズ変更：特大
+        /// </summary>
+        private void ImageExtraLargeMenuItem_Click(object sender, EventArgs e)
+        {
+            imageManager?.ResizeImage(IMAGE_SIZE_EXTRA_LARGE);
+        }
 
         /// <summary>
         /// 画像を復元（データベースから読み込み時用）

@@ -44,7 +44,15 @@ namespace StickyNoteApp
             this.colorGreenMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.colorOrangeMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.colorPurpleMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.imageMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.pasteImageMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.editImageMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.removeImageMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.imageSizeMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.imageSmallMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.imageMediumMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.imageLargeMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.imageExtraLargeMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.reminderMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.reminder5MinMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.reminder10MinMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -103,11 +111,14 @@ namespace StickyNoteApp
                 this.newNoteMenuItem,
                 this.topMostMenuItem,
                 this.colorMenuItem,
-                this.pasteImageMenuItem,
+                this.imageMenuItem,
                 this.reminderMenuItem,
                 this.separatorMenuItem1,
                 this.deleteMenuItem
             });
+
+            // メニューが開く前に画像の有無をチェックして表示/非表示を制御
+            this.contextMenu.Opening += new System.ComponentModel.CancelEventHandler(this.ContextMenu_Opening);
 
             // 新しい付箋を作成
             this.newNoteMenuItem.Text = "新しい付箋を作成";
@@ -149,10 +160,53 @@ namespace StickyNoteApp
             this.colorPurpleMenuItem.Text = "パープル";
             this.colorPurpleMenuItem.Click += new System.EventHandler(this.SelectColor_Purple_Click);
 
+            // 画像メニュー（サブメニュー）
+            this.imageMenuItem.Text = "画像";
+            this.imageMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+                this.pasteImageMenuItem,
+                this.editImageMenuItem,
+                new System.Windows.Forms.ToolStripSeparator(),
+                this.imageSizeMenuItem,
+                new System.Windows.Forms.ToolStripSeparator(),
+                this.removeImageMenuItem
+            });
 
             // 画像を挿入
             this.pasteImageMenuItem.Text = "画像を挿入";
             this.pasteImageMenuItem.Click += new System.EventHandler(this.PasteImageMenuItem_Click);
+
+            // 画像を編集（再登録）
+            this.editImageMenuItem.Text = "画像を編集";
+            this.editImageMenuItem.Click += new System.EventHandler(this.EditImageMenuItem_Click);
+
+            // 画像を削除
+            this.removeImageMenuItem.Text = "画像を削除";
+            this.removeImageMenuItem.Click += new System.EventHandler(this.RemoveImageMenuItem_Click);
+
+            // 画像サイズ変更（サブメニュー）
+            this.imageSizeMenuItem.Text = "画像サイズ変更";
+            this.imageSizeMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+                this.imageSmallMenuItem,
+                this.imageMediumMenuItem,
+                this.imageLargeMenuItem,
+                this.imageExtraLargeMenuItem
+            });
+
+            // 画像サイズ：小
+            this.imageSmallMenuItem.Text = "小 (100px)";
+            this.imageSmallMenuItem.Click += new System.EventHandler(this.ImageSmallMenuItem_Click);
+
+            // 画像サイズ：中
+            this.imageMediumMenuItem.Text = "中 (150px)";
+            this.imageMediumMenuItem.Click += new System.EventHandler(this.ImageMediumMenuItem_Click);
+
+            // 画像サイズ：大
+            this.imageLargeMenuItem.Text = "大 (200px)";
+            this.imageLargeMenuItem.Click += new System.EventHandler(this.ImageLargeMenuItem_Click);
+
+            // 画像サイズ：特大
+            this.imageExtraLargeMenuItem.Text = "特大 (250px)";
+            this.imageExtraLargeMenuItem.Click += new System.EventHandler(this.ImageExtraLargeMenuItem_Click);
 
             // リマインダー（サブメニュー）
             this.reminderMenuItem.Text = "リマインダー";
@@ -216,7 +270,15 @@ namespace StickyNoteApp
         private System.Windows.Forms.ToolStripMenuItem colorGreenMenuItem;
         private System.Windows.Forms.ToolStripMenuItem colorOrangeMenuItem;
         private System.Windows.Forms.ToolStripMenuItem colorPurpleMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem imageMenuItem;
         private System.Windows.Forms.ToolStripMenuItem pasteImageMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem editImageMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem removeImageMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem imageSizeMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem imageSmallMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem imageMediumMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem imageLargeMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem imageExtraLargeMenuItem;
         private System.Windows.Forms.ToolStripMenuItem reminderMenuItem;
         private System.Windows.Forms.ToolStripMenuItem reminder5MinMenuItem;
         private System.Windows.Forms.ToolStripMenuItem reminder10MinMenuItem;
