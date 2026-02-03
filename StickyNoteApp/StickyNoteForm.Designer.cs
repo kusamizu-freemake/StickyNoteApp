@@ -45,8 +45,7 @@ namespace StickyNoteApp
             this.colorOrangeMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.colorPurpleMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.imageMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.pasteImageMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.editImageMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.inserteditImageMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.removeImageMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.imageSizeMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.imageSmallMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -163,21 +162,16 @@ namespace StickyNoteApp
             // 画像メニュー（サブメニュー）
             this.imageMenuItem.Text = "画像";
             this.imageMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
-                this.pasteImageMenuItem,
-                this.editImageMenuItem,
+                this.inserteditImageMenuItem,
                 new System.Windows.Forms.ToolStripSeparator(),
                 this.imageSizeMenuItem,
                 new System.Windows.Forms.ToolStripSeparator(),
                 this.removeImageMenuItem
             });
 
-            // 画像を挿入
-            this.pasteImageMenuItem.Text = "画像を挿入";
-            this.pasteImageMenuItem.Click += new System.EventHandler(this.PasteImageMenuItem_Click);
-
-            // 画像を編集（再登録）
-            this.editImageMenuItem.Text = "画像を編集";
-            this.editImageMenuItem.Click += new System.EventHandler(this.EditImageMenuItem_Click);
+            // 画像を挿入・編集（置き換え）
+            this.inserteditImageMenuItem.Text = "画像を挿入・編集（置き換え）";
+            this.inserteditImageMenuItem.Click += new System.EventHandler(this.InsertEditImageMenuItem_Click);
 
             // 画像を削除
             this.removeImageMenuItem.Text = "画像を削除";
@@ -271,8 +265,7 @@ namespace StickyNoteApp
         private System.Windows.Forms.ToolStripMenuItem colorOrangeMenuItem;
         private System.Windows.Forms.ToolStripMenuItem colorPurpleMenuItem;
         private System.Windows.Forms.ToolStripMenuItem imageMenuItem;
-        private System.Windows.Forms.ToolStripMenuItem pasteImageMenuItem;
-        private System.Windows.Forms.ToolStripMenuItem editImageMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem inserteditImageMenuItem;
         private System.Windows.Forms.ToolStripMenuItem removeImageMenuItem;
         private System.Windows.Forms.ToolStripMenuItem imageSizeMenuItem;
         private System.Windows.Forms.ToolStripMenuItem imageSmallMenuItem;

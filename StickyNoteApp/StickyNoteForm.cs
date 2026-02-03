@@ -555,16 +555,10 @@ namespace StickyNoteApp
             // 右クリックメニューを追加
             var imageContextMenu = new ContextMenuStrip();
 
-            // 画像を挿入
-            var insertImageItem = new ToolStripMenuItem("画像を挿入");
-            insertImageItem.Click += (s, e) => imageManager?.SelectAndLoadImageFromFile();
-            imageContextMenu.Items.Add(insertImageItem);
-            imageContextMenu.Items.Add(new ToolStripSeparator()); // 区切り線
-
-            // 画像を編集（再登録）
-            var editImageItem = new ToolStripMenuItem("画像を編集");
-            editImageItem.Click += (s, e) => imageManager?.SelectAndLoadImageFromFile();
-            imageContextMenu.Items.Add(editImageItem);
+            // 画像を編集（置き換え）
+            var inserteditImageItem = new ToolStripMenuItem("画像を編集（置き換え）");
+            inserteditImageItem.Click += (s, e) => imageManager?.SelectAndLoadImageFromFile();
+            imageContextMenu.Items.Add(inserteditImageItem);
             imageContextMenu.Items.Add(new ToolStripSeparator()); // 区切り線
 
             // 画像を削除
@@ -786,34 +780,24 @@ namespace StickyNoteApp
         }
 
         /// <summary>
-        /// 右クリックメニューが開く前に、画像の有無に応じてメニュー項目を表示/非表示
+        /// 右クリックメニューが開く前に、画像の有無に応じて削除・サイズ変更メニューを表示/非表示
         /// </summary>
         private void ContextMenu_Opening(object sender, System.ComponentModel.CancelEventArgs e)
         {
             // 画像があるかどうかをチェック
             bool hasImage = pictureBox != null && pictureBox.Image != null;
 
-            // 画像がある時だけ表示するメニュー項目
-            editImageMenuItem.Visible = hasImage;
+            // 画像がある時だけ表示する（削除・サイズ変更）
             removeImageMenuItem.Visible = hasImage;
             imageSizeMenuItem.Visible = hasImage;
 
-            // 画像がない時だけ表示するメニュー項目
-            pasteImageMenuItem.Visible = !hasImage;
         }
 
-        /// <summary>
-        /// 画像を挿入（ファイル選択ダイアログ）
-        /// </summary>
-        private void PasteImageMenuItem_Click(object sender, EventArgs e)
-        {
-            imageManager?.SelectAndLoadImageFromFile();
-        }
 
         /// <summary>
-        /// 画像を編集（画像を再選択して貼り換える）
+        /// 画像を挿入・編集（画像を再選択して貼り換える）
         /// </summary>
-        private void EditImageMenuItem_Click(object sender, EventArgs e)
+        private void InsertEditImageMenuItem_Click(object sender, EventArgs e)
         {
             // ImageManagerの既存メソッドを呼び出すだけでOK
             // このメソッドは内部で「古い画像を削除→新しい画像を保存」を自動実行
