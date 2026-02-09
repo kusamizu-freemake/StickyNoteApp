@@ -30,6 +30,170 @@ namespace StickyNoteApp
         public string CapturedImagePath => resizedImagePath ?? originalImagePath; // 互換性
 
         /// <summary>
+        /// 画像の表示高さを更新する（ImageResizeManagerから呼び出し）
+        /// </summary>
+        public void SetImageDisplayHeight(int height)
+        {
+            imageDisplayHeight = height;
+        }
+
+        /// <summary>
+        /// 画像をリサイズして保存する（実ファイル作成）
+        /// </summary>
+        /// <param name="height">リサイズ後の高さ（px）</param>
+        /// <returns>リサイズ済み画像のパス、失敗時またはアニメーションGIFの場合はnull</returns>
+        public string CreateResizedImage(int height)
+        {
+            if (string.IsNullOrEmpty(originalImagePath))
+            {
+                System.Diagnostics.Debug.WriteLine("元画像パスが設定されていません");
+                return null;
+            }
+
+            if (!File.Exists(originalImagePath))
+            {
+                System.Diagnostics.Debug.WriteLine($"元画像ファイルが見つかりません: {originalImagePath}");
+                return null;
+            }
+
+            try
+            {
+                // 古いリサイズ済み画像を削除
+                if (!string.IsNullOrEmpty(resizedImagePath))
+                {
+                    ImageResizer.DeleteResizedImage(resizedImagePath);
+                }
+
+                // 新しいサイズでリサイズ実行
+                string newResizedPath = ImageResizer.ResizeAndSaveImage(
+                    originalImagePath,
+                    height,
+                    parentForm.NoteId
+                );
+
+                // リサイズ済みパスを更新
+                resizedImagePath = newResizedPath;
+
+                System.Diagnostics.Debug.WriteLine($"リサイズ済み画像を作成: {newResizedPath}");
+                return newResizedPath;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"画像リサイズエラー: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// 現在表示中の画像をユーザーが指定した場所にリサイズして保存する。
+        /// </summary>
+        /// <param name="height">リサイズ後の高さ（px）、0の場合は元のサイズで保存</param>
+        public void SaveResizedImageToUserLocation(int height)
+        {
+            if (string.IsNullOrEmpty(originalImagePath))
+            {
+                MessageBox.Show(
+                    "保存する画像がありません。",
+                    "情報",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return;
+            }
+
+            if (!File.Exists(originalImagePath))
+            {
+                MessageBox.Show(
+                    "元画像ファイルが見つかりません。",
+                    "エラー",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+                return;
+            }
+
+            // 推奨ファイル名を生成（付箋IDから）
+            string suggestedFileName = $"note_{parentForm.NoteId}_image";
+
+            // height=0の場合は元のサイズで保存
+            if (height == 0)
+            {
+                SaveOriginalImageToUserLocation(suggestedFileName);
+            }
+            else
+            {
+                // ユーザー指定場所にリサイズして保存
+                ImageResizer.ResizeAndSaveToUserLocation(
+                    originalImagePath,
+                    height,
+                    suggestedFileName
+                );
+            }
+        }
+
+        /// <summary>
+        /// 元画像をユーザーが指定した場所にそのまま保存する。
+        /// </summary>
+        /// <param name="suggestedFileName">推奨ファイル名</param>
+        private void SaveOriginalImageToUserLocation(string suggestedFileName)
+        {
+            try
+            {
+                using (var saveDialog = new SaveFileDialog())
+                {
+                    // 元画像の拡張子を取得
+                    string originalExt = Path.GetExtension(originalImagePath).ToLower();
+                    string defaultExt = string.IsNullOrEmpty(originalExt) ? ".png" : originalExt.TrimStart('.');
+
+                    saveDialog.FileName = $"{suggestedFileName}_original";
+                    saveDialog.Filter = "PNG画像|*.png|JPEG画像|*.jpg;*.jpeg|GIF画像|*.gif|すべてのファイル|*.*";
+
+                    // 元画像の拡張子に応じてFilterIndexを設定
+                    switch (originalExt)
+                    {
+                        case ".png":
+                            saveDialog.FilterIndex = 1; // PNG
+                            break;
+                        case ".jpg":
+                        case ".jpeg":
+                            saveDialog.FilterIndex = 2; // JPEG
+                            break;
+                        case ".gif":
+                            saveDialog.FilterIndex = 3; // GIF
+                            break;
+                        default:
+                            saveDialog.FilterIndex = 1; // デフォルトはPNG
+                            break;
+                    }
+
+                    saveDialog.Title = "元画像を保存";
+                    saveDialog.DefaultExt = defaultExt;
+
+                    if (saveDialog.ShowDialog() == DialogResult.OK)
+                    {
+                        // 元画像をコピー
+                        File.Copy(originalImagePath, saveDialog.FileName, true);
+
+                        System.Diagnostics.Debug.WriteLine($"元画像を保存: {saveDialog.FileName}");
+
+                        MessageBox.Show(
+                            $"元画像を保存しました。\n\n保存先: {saveDialog.FileName}",
+                            "保存完了",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Information);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"元画像保存エラー: {ex.Message}");
+                MessageBox.Show(
+                    $"元画像の保存に失敗しました:\n{ex.Message}",
+                    "エラー",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>
         /// コンストラクタ
         /// </summary>
         public ImageManager(StickyNoteForm form, PictureBox picBox)
@@ -133,24 +297,6 @@ namespace StickyNoteApp
                 var Image = pictureBox.Image;
                 pictureBox.Image = null;
                 Image.Dispose();
-            }
-        }
-
-        /// <summary>
-        /// 画像サイズを変更
-        /// </summary>
-        public void ResizeImage(int height)
-        {
-            if (pictureBox.Visible)
-            {
-                pictureBox.Height = height;
-                imageDisplayHeight = height;
-
-                // テキストボックスの位置を調整
-                AdjustTextBoxPosition();
-
-                // 画像サイズ変更完了時に保存
-                parentForm.SaveCurrentNoteState();
             }
         }
 
@@ -369,7 +515,7 @@ namespace StickyNoteApp
         /// <summary>
         /// テキストボックスの位置を調整
         /// </summary>
-        private void AdjustTextBoxPosition()
+        public void AdjustTextBoxPosition()
         {
             parentForm.txtNote.Dock = DockStyle.None;
             parentForm.txtNote.Top = pictureBox.Bottom;

@@ -99,6 +99,8 @@
     <Compile Include="DbIntegrityChecker.cs" />
     <Compile Include="HotkeyManager.cs" />
     <Compile Include="ImageManager.cs" />
+    <Compile Include="Imageresizemanager.cs" />
+    <Compile Include="ImageResizer.cs" />
     <Compile Include="ReminderManager.cs" />
     <Compile Include="ReminderManager.Designer.cs">
       <DependentUpon>ReminderManager.cs</DependentUpon>
