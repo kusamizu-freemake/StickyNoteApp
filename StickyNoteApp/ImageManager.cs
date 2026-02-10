@@ -30,6 +30,38 @@ namespace StickyNoteApp
         public string CapturedImagePath => resizedImagePath ?? originalImagePath; // 互換性
 
         /// <summary>
+        /// 画像の表示高さを更新する（ImageResizeManagerから呼び出し）
+        /// </summary>
+        public void SetImageDisplayHeight(int height)
+        {
+            imageDisplayHeight = height;
+        }
+
+        /// <summary>
+        /// 元画像のパスを取得する
+        /// </summary>
+        public string GetOriginalImagePath()
+        {
+            return originalImagePath;
+        }
+
+        /// <summary>
+        /// リサイズ済み画像のパスを取得する
+        /// </summary>
+        public string GetResizedImagePath()
+        {
+            return resizedImagePath;
+        }
+
+        /// <summary>
+        /// リサイズ済み画像のパスを設定する
+        /// </summary>
+        public void SetResizedImagePath(string path)
+        {
+            resizedImagePath = path;
+        }
+
+        /// <summary>
         /// コンストラクタ
         /// </summary>
         public ImageManager(StickyNoteForm form, PictureBox picBox)
@@ -133,24 +165,6 @@ namespace StickyNoteApp
                 var Image = pictureBox.Image;
                 pictureBox.Image = null;
                 Image.Dispose();
-            }
-        }
-
-        /// <summary>
-        /// 画像サイズを変更
-        /// </summary>
-        public void ResizeImage(int height)
-        {
-            if (pictureBox.Visible)
-            {
-                pictureBox.Height = height;
-                imageDisplayHeight = height;
-
-                // テキストボックスの位置を調整
-                AdjustTextBoxPosition();
-
-                // 画像サイズ変更完了時に保存
-                parentForm.SaveCurrentNoteState();
             }
         }
 
@@ -369,7 +383,7 @@ namespace StickyNoteApp
         /// <summary>
         /// テキストボックスの位置を調整
         /// </summary>
-        private void AdjustTextBoxPosition()
+        public void AdjustTextBoxPosition()
         {
             parentForm.txtNote.Dock = DockStyle.None;
             parentForm.txtNote.Top = pictureBox.Bottom;

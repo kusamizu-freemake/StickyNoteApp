@@ -188,19 +188,19 @@ namespace StickyNoteApp
 
             // 画像サイズ：小
             this.imageSmallMenuItem.Text = "小 (100px)";
-            this.imageSmallMenuItem.Click += new System.EventHandler(this.ImageSmallMenuItem_Click);
+            //this.imageSmallMenuItem.Click += new System.EventHandler(this.ImageSmallMenuItem_Click);
 
             // 画像サイズ：中
             this.imageMediumMenuItem.Text = "中 (150px)";
-            this.imageMediumMenuItem.Click += new System.EventHandler(this.ImageMediumMenuItem_Click);
+            //this.imageMediumMenuItem.Click += new System.EventHandler(this.ImageMediumMenuItem_Click);
 
             // 画像サイズ：大
             this.imageLargeMenuItem.Text = "大 (200px)";
-            this.imageLargeMenuItem.Click += new System.EventHandler(this.ImageLargeMenuItem_Click);
+            //this.imageLargeMenuItem.Click += new System.EventHandler(this.ImageLargeMenuItem_Click);
 
             // 画像サイズ：特大
             this.imageExtraLargeMenuItem.Text = "特大 (250px)";
-            this.imageExtraLargeMenuItem.Click += new System.EventHandler(this.ImageExtraLargeMenuItem_Click);
+            //this.imageExtraLargeMenuItem.Click += new System.EventHandler(this.ImageExtraLargeMenuItem_Click);
 
             // リマインダー（サブメニュー）
             this.reminderMenuItem.Text = "リマインダー";

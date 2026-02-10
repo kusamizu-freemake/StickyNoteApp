@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Drawing;
+using System.IO;
 using System.Windows.Forms;
 
 namespace StickyNoteApp
@@ -20,11 +21,11 @@ namespace StickyNoteApp
         private const int NEW_NOTE_OFFSET_X = 30; // 新規付箋のX方向オフセット
         private const int NEW_NOTE_OFFSET_Y = 30; // 新規付箋のY方向オフセット
 
-        // 画像表示関連
-        private const int IMAGE_SIZE_SMALL = 100; // 画像サイズ：小
-        private const int IMAGE_SIZE_MEDIUM = 150; // 画像サイズ：中
-        private const int IMAGE_SIZE_LARGE = 200; // 画像サイズ：大
-        private const int IMAGE_SIZE_EXTRA_LARGE = 250; // 画像サイズ：特大
+        // 画像管理
+        private PictureBox pictureBox;
+        private ImageManager imageManager;
+        private ImageResizeManager imageResizeManager;
+        private ImageResizer imageResizer;
 
         // テキストプレビュー関連
         private const int PREVIEW_TEXT_MAX_LENGTH = 20; // プレビューテキストの最大文字数
@@ -68,10 +69,6 @@ namespace StickyNoteApp
         // リマインダーマネージャー
         private ReminderManager reminderManager;
 
-        // 画像管理
-        private PictureBox pictureBox;
-        private ImageManager imageManager;
-
         // データベース保存用プロパティ（ImageManagerへの委譲）
         public string OriginalImagePath => imageManager?.OriginalImagePath; // 元画像のパス（データベース保存用）
         public string ResizedImagePath => imageManager?.ResizedImagePath; // リサイズ済み画像のパス（データベース保存用）
@@ -84,10 +81,23 @@ namespace StickyNoteApp
             InitializeEventHandlers();        // 付箋内容変更検知用のイベントハンドラーの初期化
             InitializeResizeHandlers();       // サイズ変更ハンドラーの初期化（リサイズ機能）
             InitializeReminder();             // リマインダー管理の初期化
-            InitializePictureBox();           // 画像表示用のPictureBox初期化
 
-            // 画像マネージャーの初期化
+            // 画像マネージャーとリサイズマネージャーを先に初期化
+            pictureBox = new PictureBox();    // PictureBoxを先に作成
             imageManager = new ImageManager(this, pictureBox);
+
+            // 画像リサイザーの初期化（インスタンス化）
+            string imageFolder = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "StickyNoteApp",
+                "Images");
+            imageResizer = new ImageResizer(imageFolder);
+
+            // 画像リサイズマネージャーの初期化（ImageResizerを渡す）
+            imageResizeManager = new ImageResizeManager(this, pictureBox, imageManager, imageResizer);
+
+            // この時点で imageManager と imageResizeManager は使用可能
+            InitializePictureBox();
 
             // 最前面表示の初期状態を反映
             UpdateTopMostMenuState();
@@ -541,7 +551,8 @@ namespace StickyNoteApp
         /// </summary>
         private void InitializePictureBox()
         {
-            pictureBox = new PictureBox();
+
+
             pictureBox.SizeMode = PictureBoxSizeMode.Zoom;
             pictureBox.Dock = DockStyle.Top;
             pictureBox.Height = 0;
@@ -551,6 +562,11 @@ namespace StickyNoteApp
 
             // ダブルクリックで画像を削除
             pictureBox.DoubleClick += PictureBox_DoubleClick;
+
+            // リサイズ用のマウスイベントハンドラーを追加
+            pictureBox.MouseMove += PictureBox_MouseMove;
+            pictureBox.MouseDown += PictureBox_MouseDown;
+            pictureBox.MouseUp += PictureBox_MouseUp;
 
             // 右クリックメニューを追加
             var imageContextMenu = new ContextMenuStrip();
@@ -566,27 +582,39 @@ namespace StickyNoteApp
             deleteImageItem.Click += (s, e) => imageManager?.RemoveImage();
             imageContextMenu.Items.Add(deleteImageItem);
 
+            imageContextMenu.Items.Add(new ToolStripSeparator()); // 区切り線
+
             // 画像サイズ変更サブメニュー
             var resizeImageItem = new ToolStripMenuItem("画像サイズ");
-
-            // サイズオプション
-            var sizeSmallItem = new ToolStripMenuItem("小 (100px)");
-            sizeSmallItem.Click += (s, e) => imageManager?.ResizeImage(IMAGE_SIZE_SMALL);
-            resizeImageItem.DropDownItems.Add(sizeSmallItem);
-
-            var sizeMediumItem = new ToolStripMenuItem("中 (150px)");
-            sizeMediumItem.Click += (s, e) => imageManager?.ResizeImage(IMAGE_SIZE_MEDIUM);
-            resizeImageItem.DropDownItems.Add(sizeMediumItem);
-
-            var sizeLargeItem = new ToolStripMenuItem("大 (200px)");
-            sizeLargeItem.Click += (s, e) => imageManager?.ResizeImage(IMAGE_SIZE_LARGE);
-            resizeImageItem.DropDownItems.Add(sizeLargeItem);
-
-            var sizeExtraLargeItem = new ToolStripMenuItem("特大 (250px)");
-            sizeExtraLargeItem.Click += (s, e) => imageManager?.ResizeImage(IMAGE_SIZE_EXTRA_LARGE);
-            resizeImageItem.DropDownItems.Add(sizeExtraLargeItem);
-
+            imageResizeManager.CreateSizeMenuItems(resizeImageItem);
             imageContextMenu.Items.Add(resizeImageItem);
+
+            // 名前を付けて保存サブメニュー
+            var saveAsImageItem = new ToolStripMenuItem("名前を付けて保存");
+
+            var saveAsSmallItem = new ToolStripMenuItem("小 (100px) で保存");
+            saveAsSmallItem.Click += (s, e) => imageResizeManager?.SaveResizedImageToUserLocation(ImageResizeManager.SIZE_SMALL);
+            saveAsImageItem.DropDownItems.Add(saveAsSmallItem);
+
+            var saveAsMediumItem = new ToolStripMenuItem("中 (150px) で保存");
+            saveAsMediumItem.Click += (s, e) => imageResizeManager?.SaveResizedImageToUserLocation(ImageResizeManager.SIZE_MEDIUM);
+            saveAsImageItem.DropDownItems.Add(saveAsMediumItem);
+
+            var saveAsLargeItem = new ToolStripMenuItem("大 (200px) で保存");
+            saveAsLargeItem.Click += (s, e) => imageResizeManager?.SaveResizedImageToUserLocation(ImageResizeManager.SIZE_LARGE);
+            saveAsImageItem.DropDownItems.Add(saveAsLargeItem);
+
+            var saveAsExtraLargeItem = new ToolStripMenuItem("特大 (250px) で保存");
+            saveAsExtraLargeItem.Click += (s, e) => imageResizeManager?.SaveResizedImageToUserLocation(ImageResizeManager.SIZE_EXTRA_LARGE);
+            saveAsImageItem.DropDownItems.Add(saveAsExtraLargeItem);
+
+            saveAsImageItem.DropDownItems.Add(new ToolStripSeparator()); // 区切り線
+
+            var saveAsOriginalItem = new ToolStripMenuItem("元のサイズで保存");
+            saveAsOriginalItem.Click += (s, e) => imageResizeManager?.SaveResizedImageToUserLocation(0); // 0は元サイズ
+            saveAsImageItem.DropDownItems.Add(saveAsOriginalItem);
+
+            imageContextMenu.Items.Add(saveAsImageItem);
 
             pictureBox.ContextMenuStrip = imageContextMenu;
 
@@ -612,6 +640,75 @@ namespace StickyNoteApp
             if (result == DialogResult.Yes)
             {
                 imageManager?.RemoveImage();
+            }
+        }
+
+        /// <summary>
+        /// PictureBoxのマウス移動（サイズ変更用）
+        /// </summary>
+        private void PictureBox_MouseMove(object sender, MouseEventArgs e)
+        {
+            // PictureBox内の座標をフォーム座標に変換
+            Point formPoint = this.pictureBox.PointToScreen(e.Location);
+            formPoint = this.PointToClient(formPoint);
+
+            if (resizing)
+            {
+                PerformResize(formPoint);
+            }
+            else
+            {
+                // 枠の近くにいる場合のみカーソルを変更
+                ResizeDirection direction = GetResizeDirection(formPoint);
+                if (direction != ResizeDirection.None)
+                {
+                    UpdateCursor(formPoint);
+                }
+                else
+                {
+                    // 枠から離れている場合は通常のカーソル
+                    this.pictureBox.Cursor = Cursors.Default;
+                }
+            }
+        }
+
+        /// <summary>
+        /// PictureBoxのマウスダウン（サイズ変更開始）
+        /// </summary>
+        private void PictureBox_MouseDown(object sender, MouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Left)
+            {
+                Point formPoint = this.pictureBox.PointToScreen(e.Location);
+                formPoint = this.PointToClient(formPoint);
+
+                resizeDirection = GetResizeDirection(formPoint);
+
+                // 枠の近くでのみサイズ変更を開始
+                if (resizeDirection != ResizeDirection.None)
+                {
+                    resizing = true;
+                    resizeStart = formPoint;
+                    resizeStartSize = this.Size;
+                    resizeStartLocation = this.Location;
+                    this.Capture = true;
+                }
+            }
+        }
+
+        /// <summary>
+        /// PictureBoxのマウスアップ（サイズ変更終了）
+        /// </summary>
+        private void PictureBox_MouseUp(object sender, MouseEventArgs e)
+        {
+            if (resizing)
+            {
+                resizing = false;
+                resizeDirection = ResizeDirection.None;
+                this.Capture = false;
+
+                // サイズ変更完了時に保存
+                SaveCurrentNoteState();
             }
         }
 
@@ -825,38 +922,6 @@ namespace StickyNoteApp
                     imageManager?.RemoveImage();
                 }
             }
-        }
-
-        /// <summary>
-        /// 画像サイズ変更：小
-        /// </summary>
-        private void ImageSmallMenuItem_Click(object sender, EventArgs e)
-        {
-            imageManager?.ResizeImage(IMAGE_SIZE_SMALL);
-        }
-
-        /// <summary>
-        /// 画像サイズ変更：中
-        /// </summary>
-        private void ImageMediumMenuItem_Click(object sender, EventArgs e)
-        {
-            imageManager?.ResizeImage(IMAGE_SIZE_MEDIUM);
-        }
-
-        /// <summary>
-        /// 画像サイズ変更：大
-        /// </summary>
-        private void ImageLargeMenuItem_Click(object sender, EventArgs e)
-        {
-            imageManager?.ResizeImage(IMAGE_SIZE_LARGE);
-        }
-
-        /// <summary>
-        /// 画像サイズ変更：特大
-        /// </summary>
-        private void ImageExtraLargeMenuItem_Click(object sender, EventArgs e)
-        {
-            imageManager?.ResizeImage(IMAGE_SIZE_EXTRA_LARGE);
         }
 
         /// <summary>
