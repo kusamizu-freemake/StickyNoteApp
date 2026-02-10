@@ -11,16 +11,29 @@ namespace StickyNoteApp
     /// </summary>
     public class ImageResizer
     {
+        private readonly string imageFolder;
+
         /// <summary>
-        /// リサイズ後の画像保存先フォルダ（元画像と同じフォルダを使用）
+        /// コンストラクタ
         /// </summary>
-        private static string GetResizedImageFolder()
+        /// <param name="folder">リサイズ済み画像の保存先フォルダ</param>
+        public ImageResizer(string folder)
         {
-            return Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "StickyNoteApp",
-                "Images"
-            );
+            imageFolder = folder;
+
+            // フォルダが存在しない場合は作成
+            if (!Directory.Exists(imageFolder))
+            {
+                Directory.CreateDirectory(imageFolder);
+            }
+        }
+
+        /// <summary>
+        /// リサイズ後の画像保存先フォルダを取得
+        /// </summary>
+        private string GetResizedImageFolder()
+        {
+            return imageFolder;
         }
 
         /// <summary>
@@ -29,7 +42,7 @@ namespace StickyNoteApp
         /// <param name="originalImage">元画像</param>
         /// <param name="newHeight">リサイズ後の高さ（px）</param>
         /// <returns>リサイズされたBitmap（呼び出し側でDisposeする必要がある）</returns>
-        public static Bitmap ResizeImage(Image originalImage, int newHeight)
+        public Bitmap ResizeImage(Image originalImage, int newHeight)
         {
             if (originalImage == null)
                 throw new ArgumentNullException(nameof(originalImage));
@@ -62,7 +75,7 @@ namespace StickyNoteApp
         /// <param name="newHeight">リサイズ後の高さ（px）</param>
         /// <param name="noteId">付箋ID（ファイル名生成に使用）</param>
         /// <returns>リサイズ後の画像の保存先パス</returns>
-        public static string ResizeAndSaveImage(string originalImagePath, int newHeight, string noteId)
+        public string ResizeAndSaveImage(string originalImagePath, int newHeight, string noteId)
         {
             if (string.IsNullOrEmpty(originalImagePath))
                 throw new ArgumentNullException(nameof(originalImagePath));
@@ -121,7 +134,7 @@ namespace StickyNoteApp
         /// <summary>
         /// アニメーションGIFかどうかを判定する。
         /// </summary>
-        private static bool IsAnimatedGif(string imagePath)
+        private bool IsAnimatedGif(string imagePath)
         {
             try
             {
@@ -146,7 +159,7 @@ namespace StickyNoteApp
         /// <summary>
         /// 拡張子から適切なImageFormatを取得する。
         /// </summary>
-        private static ImageFormat GetImageFormat(string extension)
+        private ImageFormat GetImageFormat(string extension)
         {
             switch (extension.ToLower())
             {
@@ -167,7 +180,7 @@ namespace StickyNoteApp
         /// 古いリサイズ済み画像ファイルを削除する。
         /// </summary>
         /// <param name="resizedImagePath">削除する画像ファイルのパス</param>
-        public static void DeleteResizedImage(string resizedImagePath)
+        public void DeleteResizedImage(string resizedImagePath)
         {
             if (string.IsNullOrEmpty(resizedImagePath)) return;
             if (!File.Exists(resizedImagePath)) return;
@@ -192,7 +205,7 @@ namespace StickyNoteApp
         /// <param name="newHeight">リサイズ後の高さ（px）</param>
         /// <param name="suggestedFileName">推奨ファイル名（拡張子なし）</param>
         /// <returns>保存したパス、キャンセル時はnull</returns>
-        public static string ResizeAndSaveToUserLocation(string originalImagePath, int newHeight, string suggestedFileName = "resized_image")
+        public string ResizeAndSaveToUserLocation(string originalImagePath, int newHeight, string suggestedFileName = "resized_image")
         {
             if (string.IsNullOrEmpty(originalImagePath))
                 throw new ArgumentNullException(nameof(originalImagePath));
@@ -229,7 +242,7 @@ namespace StickyNoteApp
                             saveDialog.FileName = $"{suggestedFileName}_{newHeight}px";
 
                             // フィルタ設定
-                            saveDialog.Filter = "PNG画像|*.png|JPEG画像|*.jpg|すべてのファイル|*.*";
+                            saveDialog.Filter = "PNG画像|*.png|JPEG画像|*.jpg;*.jpeg|すべてのファイル|*.*";
                             saveDialog.FilterIndex = 1; // デフォルトはPNG
                             saveDialog.Title = "リサイズ済み画像を保存";
                             saveDialog.DefaultExt = "png";
@@ -281,7 +294,7 @@ namespace StickyNoteApp
         /// </summary>
         /// <param name="imagePath">画像ファイルのパス</param>
         /// <returns>画像サイズ（Size構造体）、失敗時はSize.Empty</returns>
-        public static Size GetImageSize(string imagePath)
+        public Size GetImageSize(string imagePath)
         {
             if (string.IsNullOrEmpty(imagePath) || !File.Exists(imagePath))
                 return Size.Empty;
@@ -296,6 +309,89 @@ namespace StickyNoteApp
             catch
             {
                 return Size.Empty;
+            }
+        }
+
+        /// <summary>
+        /// 元画像をユーザーが指定した場所にそのまま保存する。
+        /// </summary>
+        /// <param name="originalImagePath">元画像のファイルパス</param>
+        /// <param name="suggestedFileName">推奨ファイル名</param>
+        /// <returns>保存したパス、キャンセル時はnull</returns>
+        public string SaveOriginalImageToUserLocation(string originalImagePath, string suggestedFileName)
+        {
+            if (string.IsNullOrEmpty(originalImagePath))
+                return null;
+
+            if (!File.Exists(originalImagePath))
+                return null;
+
+            try
+            {
+                using (var saveDialog = new System.Windows.Forms.SaveFileDialog())
+                {
+                    // 元画像の拡張子を取得
+                    string originalExt = Path.GetExtension(originalImagePath).ToLower();
+                    string defaultExt = string.IsNullOrEmpty(originalExt) ? ".png" : originalExt.TrimStart('.');
+
+                    // ファイル名をシンプルに
+                    saveDialog.FileName = suggestedFileName;
+                    saveDialog.Filter = "PNG画像|*.png|JPEG画像|*.jpg;*.jpeg|GIF画像|*.gif|BMP画像|*.bmp|すべてのファイル|*.*";
+
+                    // 元画像の拡張子に応じてFilterIndexを設定
+                    switch (originalExt)
+                    {
+                        case ".png":
+                            saveDialog.FilterIndex = 1; // PNG
+                            break;
+                        case ".jpg":
+                        case ".jpeg":
+                            saveDialog.FilterIndex = 2; // JPEG
+                            break;
+                        case ".gif":
+                            saveDialog.FilterIndex = 3; // GIF
+                            break;
+                        case ".bmp":
+                            saveDialog.FilterIndex = 4; // BMP
+                            break;
+                        default:
+                            saveDialog.FilterIndex = 1; // デフォルトはPNG
+                            break;
+                    }
+
+                    saveDialog.Title = "元画像を保存";
+                    saveDialog.DefaultExt = defaultExt;
+
+                    if (saveDialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                    {
+                        // 元画像をコピー
+                        File.Copy(originalImagePath, saveDialog.FileName, true);
+
+                        System.Diagnostics.Debug.WriteLine($"元画像を保存: {saveDialog.FileName}");
+
+                        System.Windows.Forms.MessageBox.Show(
+                            $"元画像を保存しました。\n\n保存先: {saveDialog.FileName}",
+                            "保存完了",
+                            System.Windows.Forms.MessageBoxButtons.OK,
+                            System.Windows.Forms.MessageBoxIcon.Information);
+
+                        return saveDialog.FileName;
+                    }
+                    else
+                    {
+                        return null;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"元画像保存エラー: {ex.Message}");
+                System.Windows.Forms.MessageBox.Show(
+                    $"元画像の保存に失敗しました:\n{ex.Message}",
+                    "エラー",
+                    System.Windows.Forms.MessageBoxButtons.OK,
+                    System.Windows.Forms.MessageBoxIcon.Error);
+                return null;
             }
         }
     }

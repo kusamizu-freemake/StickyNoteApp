@@ -19,6 +19,7 @@ namespace StickyNoteApp
         private readonly StickyNoteForm parentForm;
         private readonly PictureBox pictureBox;
         private readonly ImageManager imageManager;
+        private readonly ImageResizer imageResizer;
 
         /// <summary>
         /// コンストラクタ
@@ -26,11 +27,13 @@ namespace StickyNoteApp
         /// <param name="form">親付箋フォーム（保存メソッドの呼び出し元）</param>
         /// <param name="picBox">画像を表示しているPictureBox</param>
         /// <param name="imgManager">画像マネージャー（状態更新・レイアウト調整の委譲先）</param>
-        public ImageResizeManager(StickyNoteForm form, PictureBox picBox, ImageManager imgManager)
+        /// <param name="imgResizer">画像リサイザー（リサイズ処理の委譲先）</param>
+        public ImageResizeManager(StickyNoteForm form, PictureBox picBox, ImageManager imgManager, ImageResizer imgResizer)
         {
             parentForm = form;
             pictureBox = picBox;
             imageManager = imgManager;
+            imageResizer = imgResizer;
         }
 
         /// <summary>
@@ -44,24 +47,81 @@ namespace StickyNoteApp
         {
             if (!pictureBox.Visible) return;
 
-            // 実際の画像ファイルをリサイズして保存
-            string resizedPath = imageManager.CreateResizedImage(height);
+            // 1. 元画像パスと古いリサイズ済みパスを取得
+            string originalPath = imageManager.GetOriginalImagePath();
+            string oldResizedPath = imageManager.GetResizedImagePath();
 
-            if (resizedPath != null)
+            if (string.IsNullOrEmpty(originalPath))
             {
-                System.Diagnostics.Debug.WriteLine($"リサイズ成功: {resizedPath}");
+                System.Diagnostics.Debug.WriteLine("元画像パスが設定されていません");
+                return;
+            }
+
+            // 2. 古いリサイズ済み画像を削除
+            if (!string.IsNullOrEmpty(oldResizedPath))
+            {
+                imageResizer.DeleteResizedImage(oldResizedPath);
+            }
+
+            // 3. 新しいサイズでリサイズ実行（ImageResizerに委譲）
+            string newResizedPath = imageResizer.ResizeAndSaveImage(
+                originalPath,
+                height,
+                parentForm.NoteId
+            );
+
+            if (newResizedPath != null)
+            {
+                System.Diagnostics.Debug.WriteLine($"リサイズ成功: {newResizedPath}");
+
+                // 4. ImageManagerに新しいパスを設定
+                imageManager.SetResizedImagePath(newResizedPath);
             }
             else
             {
                 System.Diagnostics.Debug.WriteLine("リサイズをスキップしました（アニメーションGIFまたはエラー）");
             }
 
-            // 既存の処理（表示サイズの変更）
+            // 5. 表示サイズを変更
             pictureBox.Height = height;
             imageManager.SetImageDisplayHeight(height);
             imageManager.AdjustTextBoxPosition();
 
+            // 6. 保存
             parentForm.SaveCurrentNoteState();
+        }
+
+        /// <summary>
+        /// ユーザー指定場所に画像を保存する（表示サイズは変更しない）
+        /// </summary>
+        /// <param name="height">リサイズ後の高さ（px）、0の場合は元のサイズで保存</param>
+        public void SaveResizedImageToUserLocation(int height)
+        {
+            string originalPath = imageManager.GetOriginalImagePath();
+
+            if (string.IsNullOrEmpty(originalPath))
+            {
+                MessageBox.Show(
+                    "保存する画像がありません。",
+                    "情報",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return;
+            }
+
+            // 推奨ファイル名
+            string suggestedFileName = "image";
+
+            if (height == 0)
+            {
+                // 元のサイズで保存（ImageResizerに委譲）
+                imageResizer.SaveOriginalImageToUserLocation(originalPath, suggestedFileName);
+            }
+            else
+            {
+                // リサイズして保存（ImageResizerに委譲）
+                imageResizer.ResizeAndSaveToUserLocation(originalPath, height, suggestedFileName);
+            }
         }
 
         /// <summary>
