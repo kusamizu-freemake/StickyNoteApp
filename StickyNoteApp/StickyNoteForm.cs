@@ -165,6 +165,18 @@ namespace StickyNoteApp
         }
 
         /// <summary>
+        /// 付箋ウィンドウが画面に表示されたときに呼ばれる処理
+        /// </summary>
+        protected override void OnShown(EventArgs e)
+        {
+            base.OnShown(e);
+
+            // 画像ありで起動した場合、テキスト入力欄の位置がズレることがあるため
+            // ウィンドウ表示後に正しい位置へ調整し直す
+            imageManager?.AdjustTextBoxPosition();
+        }
+
+        /// <summary>
         /// テキストボックスのマウス移動（サイズ変更用）
         /// </summary>
         private void TxtNote_MouseMove(object sender, MouseEventArgs e)
@@ -471,6 +483,9 @@ namespace StickyNoteApp
 
             // 位置とサイズを同時に更新
             this.SetBounds(newLeft, newTop, newWidth, newHeight);
+
+            // フォームサイズが変わったら txtNote（とPictureBox後の領域）を追従させる
+            imageManager?.AdjustTextBoxPosition();
         }
 
         /// <summary>

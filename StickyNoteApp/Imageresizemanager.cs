@@ -1,4 +1,5 @@
 using System;
+using System.Drawing;
 using System.Windows.Forms;
 
 namespace StickyNoteApp
@@ -14,6 +15,9 @@ namespace StickyNoteApp
         public const int SIZE_MEDIUM = 150; // 中（デフォルト）
         public const int SIZE_LARGE = 200; // 大
         public const int SIZE_EXTRA_LARGE = 250; // 特大
+
+        // テキスト領域の最小高さ
+        private const int MIN_TEXT_AREA_HEIGHT = 80;
 
         // 依存オブジェクト
         private readonly StickyNoteForm parentForm;
@@ -87,8 +91,40 @@ namespace StickyNoteApp
             imageManager.SetImageDisplayHeight(height);
             imageManager.AdjustTextBoxPosition();
 
+            // テキスト領域が十分に見えるように付箋サイズを調整
+            EnsureTextAreaVisible(height);
+
             // 6. 保存
             parentForm.SaveCurrentNoteState();
+        }
+
+        /// <summary>
+        /// テキスト領域が十分に表示されるように付箋サイズを調整
+        /// 画像サイズ変更時にテキストが見えなくならないようにする
+        /// </summary>
+        /// <param name="imageHeight">画像の高さ</param>
+        private void EnsureTextAreaVisible(int imageHeight)
+        {
+            // タイトルバーの高さを取得
+            int TitleBarHeight = parentForm.Controls["titleBar"]?.Height ?? 40;
+
+            // 現在のテキスト領域の高さを計算
+            int CurrentTextHeight = parentForm.ClientSize.Height - TitleBarHeight - imageHeight;
+
+            // テキスト領域が最小高さより小さい場合、付箋を拡大
+            if (CurrentTextHeight < MIN_TEXT_AREA_HEIGHT)
+            {
+                int RequiredHeight = TitleBarHeight + imageHeight + MIN_TEXT_AREA_HEIGHT;
+                parentForm.ClientSize = new Size(parentForm.ClientSize.Width, RequiredHeight);
+
+                // サイズ変更後、再度テキストボックスの位置を調整
+                imageManager.AdjustTextBoxPosition();
+
+                System.Diagnostics.Debug.WriteLine(
+                    $"付箋サイズを自動調整: {parentForm.ClientSize.Height}px " +
+                    $"(画像: {imageHeight}px, テキスト領域: {MIN_TEXT_AREA_HEIGHT}px確保)"
+                );
+            }
         }
 
         /// <summary>
