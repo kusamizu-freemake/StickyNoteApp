@@ -16,6 +16,9 @@ namespace StickyNoteApp
         private const int IMAGE_LEFT_MARGIN = 0;
         private const long MAX_FILE_SIZE_BYTES = 2 * 1024 * 1024; // 2MB
 
+        // テキスト領域の最小高さを確保
+        private const int MIN_TEXT_AREA_HEIGHT = 80; // テキストが見えるための最小高さ
+
         private readonly StickyNoteForm parentForm;
         private readonly PictureBox pictureBox;
 
@@ -127,8 +130,9 @@ namespace StickyNoteApp
                             pictureBox.Visible = true;
                             imageDisplayHeight = DEFAULT_IMAGE_HEIGHT;
 
-                            // テキストボックスの位置を調整
+                            // テキストボックスの位置を調整し、必要に応じて付箋サイズを拡大
                             AdjustTextBoxPosition();
+                            EnsureTextAreaVisible();
 
                             // 画像読み込み完了時に保存
                             parentForm.SaveCurrentNoteState();
@@ -245,6 +249,8 @@ namespace StickyNoteApp
 
                     // テキストボックスの位置を調整
                     AdjustTextBoxPosition();
+                    // 復元時も必要に応じて付箋サイズを調整
+                    EnsureTextAreaVisible();
                 }
             }
             catch (Exception ex)
@@ -385,11 +391,47 @@ namespace StickyNoteApp
         /// </summary>
         public void AdjustTextBoxPosition()
         {
+            // 画像が非表示のときは Dock=Fill のまま何もしない
+            // Dock を None に変えると txtNote.Top=0 になり,タイトルバーを覆い隠すバグが発生する
+            if (!pictureBox.Visible)
+            {
+                parentForm.txtNote.Dock = DockStyle.Fill;
+                return;
+            }
+
             parentForm.txtNote.Dock = DockStyle.None;
             parentForm.txtNote.Top = pictureBox.Bottom;
             parentForm.txtNote.Left = IMAGE_LEFT_MARGIN;
             parentForm.txtNote.Width = parentForm.ClientSize.Width;
             parentForm.txtNote.Height = parentForm.ClientSize.Height - parentForm.txtNote.Top;
+        }
+
+        /// <summary>
+        /// テキスト領域が十分に表示されるように付箋サイズを調整
+        /// 画像添付時にテキストが見えなくならないようにする
+        /// </summary>
+        private void EnsureTextAreaVisible()
+        {
+            // タイトルバーの高さを取得
+            int TitleBarHeight = parentForm.Controls["titleBar"]?.Height ?? 40;
+
+            // 現在のテキスト領域の高さを計算
+            int CurrentTextHeight = parentForm.ClientSize.Height - TitleBarHeight - pictureBox.Height;
+
+            // テキスト領域が最小高さより小さい場合、付箋を拡大
+            if (CurrentTextHeight < MIN_TEXT_AREA_HEIGHT)
+            {
+                int RequiredHeight = TitleBarHeight + pictureBox.Height + MIN_TEXT_AREA_HEIGHT;
+                parentForm.ClientSize = new Size(parentForm.ClientSize.Width, RequiredHeight);
+
+                // サイズ変更後、再度テキストボックスの位置を調整
+                AdjustTextBoxPosition();
+
+                System.Diagnostics.Debug.WriteLine(
+                    $"付箋サイズを自動調整: {parentForm.ClientSize.Height}px " +
+                    $"(画像: {pictureBox.Height}px, テキスト領域: {MIN_TEXT_AREA_HEIGHT}px確保)"
+                );
+            }
         }
 
         /// <summary>
