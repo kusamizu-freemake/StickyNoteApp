@@ -1,7 +1,7 @@
 ﻿using Microsoft.Data.Sqlite;
 using System;
 using System.Collections.Generic;
-using System.Drawing;
+using System.Diagnostics;
 using System.IO;
 
 namespace StickyNoteApp
@@ -12,15 +12,43 @@ namespace StickyNoteApp
     /// </summary>
     public static class Database
     {
+        // ログメッセージ定数
+        private const string MSG_TABLE_NOT_FOUND = "StickyNotesテーブルが存在しません。作成します。";
+        private const string MSG_ADD_COLUMN_IMAGE_PATH = "ImagePathカラムを追加します。";
+        private const string MSG_ADD_COLUMN_ORIGINAL = "OriginalImagePathカラムを追加します。";
+        private const string MSG_ADD_COLUMN_RESIZED = "ResizedImagePathカラムを追加します。";
+        private const string MSG_ADD_COLUMN_DISP_HEIGHT = "ImageDisplayHeightカラムを追加します。";
+        private const string MSG_ADD_COLUMN_REMINDER_ACTIVE = "ReminderActiveカラムを追加します。";
+        private const string MSG_ADD_COLUMN_REMINDER_TIME = "ReminderTimeカラムを追加します。";
+        private const string MSG_DBINIT_COMPLETE = "データベース初期化完了";
+        private const string MSG_DBINIT_ERROR = "データベース初期化エラー: {0}";
+        private const string MSG_IMAGE_MIGRATE_COUNT = "画像データを移行しました: {0}件";
+        private const string MSG_IMAGE_MIGRATE_ERROR = "画像データ移行エラー: {0}";
+        private const string MSG_COLUMN_ADDED = "{0}カラム追加完了";
+        private const string MSG_TABLE_CREATED = "StickyNotesテーブル作成完了";
+        private const string MSG_SKIP_SAVE_RESTORING = "[SaveOrUpdate] 復元中のため保存をスキップ";
+        private const string MSG_SAVE_ERROR = "データ保存エラー: {0}";
+        private const string MSG_SKIP_DELETE_RESTORING = "[SoftDelete] 復元中のため削除をスキップ";
+        private const string MSG_DELETE_ERROR = "データ削除エラー: {0}";
+        private const string MSG_LOAD_COUNT = "データベースから{0}件の付箋を読み込みました";
+        private const string MSG_LOAD_ERROR = "データ読み込みエラー: {0}";
+
+        // DB フォルダ・ファイル名定数
+        private const string DB_FOLDER_NAME = "StickyNoteApp";
+        private const string DD_FILE_NAME = "stickynotes.db";
+
+        // 日時フォーマット
+        private const string DATE_TIME_FORMAT = "yyyy-MM-dd HH:mm:ss";
+
         // 「SQLite Error 5: 'database is locked'.」防止
         // DB保存処理の排他制御用ロックオブジェクト
-        private static readonly object saveLock = new object();
+        private static readonly object SaveLock = new object();
 
         // データベースファイルのパス
         private static readonly string DbPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "StickyNoteApp",
-            "stickynotes.db"
+            DB_FOLDER_NAME,
+            DD_FILE_NAME
         );
 
         // 接続文字列
@@ -32,7 +60,7 @@ namespace StickyNoteApp
         public static string GetConnectionString() => ConnectionString;
 
         /// <summary>
-        /// 新しいDB接続を生成する(時点では open されていない)
+        /// 新しいDB接続を生成する(この時点では open されていない)
         /// </summary>
         private static SqliteConnection CreateConnection()
         {
@@ -45,15 +73,15 @@ namespace StickyNoteApp
         /// </summary>
         private static SqliteConnection OpenConnection()
         {
-            var con = CreateConnection();
-            con.Open();
+            var Con = CreateConnection();
+            Con.Open();
 
-            using (var cmd = con.CreateCommand())
+            using (var Cmd = Con.CreateCommand())
             {
-                cmd.ExecuteNonQuery();
+                Cmd.ExecuteNonQuery();
             }
 
-            return con;
+            return Con;
         }
 
         /// <summary>
@@ -70,105 +98,105 @@ namespace StickyNoteApp
                 SQLitePCL.Batteries.Init();
 
                 // ディレクトリが存在しない場合は作成
-                string directory = Path.GetDirectoryName(DbPath);
-                if (!Directory.Exists(directory))
+                string Directory = Path.GetDirectoryName(DbPath);
+                if (!System.IO.Directory.Exists(Directory))
                 {
-                    Directory.CreateDirectory(directory);
+                    System.IO.Directory.CreateDirectory(Directory);
                 }
 
                 // テーブル作成
-                using (SqliteConnection con = OpenConnection()) // ← 変更: OpenConnection を使う
+                using (SqliteConnection Con = OpenConnection())
                 {
                     // StickyNotesテーブル存在確認
-                    if (!TableExists(con, "StickyNotes"))
+                    if (!TableExists(Con, "StickyNotes"))
                     {
-                        System.Diagnostics.Debug.WriteLine("StickyNotesテーブルが存在しません。作成します。");
-                        CreateStickyNotesTable(con);
+                        Debug.WriteLine(MSG_TABLE_NOT_FOUND);
+                        CreateStickyNotesTable(Con);
                     }
                     else
                     {
                         // 既存のテーブルにカラムを追加
-                        if (!ColumnExists(con, "StickyNotes", "ImagePath"))
+                        if (!ColumnExists(Con, "StickyNotes", "ImagePath"))
                         {
-                            System.Diagnostics.Debug.WriteLine("ImagePathカラムを追加します。");
-                            AddColumn(con, "StickyNotes", "ImagePath", "TEXT");
+                            Debug.WriteLine(MSG_ADD_COLUMN_IMAGE_PATH);
+                            AddColumn(Con, "StickyNotes", "ImagePath", "TEXT");
                         }
 
                         // 元画像パスのカラム
-                        if (!ColumnExists(con, "StickyNotes", "OriginalImagePath"))
+                        if (!ColumnExists(Con, "StickyNotes", "OriginalImagePath"))
                         {
-                            System.Diagnostics.Debug.WriteLine("OriginalImagePathカラムを追加します。");
-                            AddColumn(con, "StickyNotes", "OriginalImagePath", "TEXT");
+                            Debug.WriteLine(MSG_ADD_COLUMN_ORIGINAL);
+                            AddColumn(Con, "StickyNotes", "OriginalImagePath", "TEXT");
                         }
 
                         // リサイズ済み画像パスのカラム
-                        if (!ColumnExists(con, "StickyNotes", "ResizedImagePath"))
+                        if (!ColumnExists(Con, "StickyNotes", "ResizedImagePath"))
                         {
-                            System.Diagnostics.Debug.WriteLine("ResizedImagePathカラムを追加します。");
-                            AddColumn(con, "StickyNotes", "ResizedImagePath", "TEXT");
+                            Debug.WriteLine(MSG_ADD_COLUMN_RESIZED);
+                            AddColumn(Con, "StickyNotes", "ResizedImagePath", "TEXT");
                         }
 
                         // 画像表示高さのカラム
-                        if (!ColumnExists(con, "StickyNotes", "ImageDisplayHeight"))
+                        if (!ColumnExists(Con, "StickyNotes", "ImageDisplayHeight"))
                         {
-                            System.Diagnostics.Debug.WriteLine("ImageDisplayHeightカラムを追加します。");
-                            AddColumn(con, "StickyNotes", "ImageDisplayHeight", "INTEGER DEFAULT 150");
+                            Debug.WriteLine(MSG_ADD_COLUMN_DISP_HEIGHT);
+                            AddColumn(Con, "StickyNotes", "ImageDisplayHeight", "INTEGER DEFAULT 150");
                         }
 
                         // リマインダー関連カラムを追加
-                        if (!ColumnExists(con, "StickyNotes", "ReminderActive"))
+                        if (!ColumnExists(Con, "StickyNotes", "ReminderActive"))
                         {
-                            System.Diagnostics.Debug.WriteLine("ReminderActiveカラムを追加します。");
-                            AddColumn(con, "StickyNotes", "ReminderActive", "INTEGER DEFAULT 0");
+                            Debug.WriteLine(MSG_ADD_COLUMN_REMINDER_ACTIVE);
+                            AddColumn(Con, "StickyNotes", "ReminderActive", "INTEGER DEFAULT 0");
                         }
 
-                        if (!ColumnExists(con, "StickyNotes", "ReminderTime"))
+                        if (!ColumnExists(Con, "StickyNotes", "ReminderTime"))
                         {
-                            System.Diagnostics.Debug.WriteLine("ReminderTimeカラムを追加します。");
-                            AddColumn(con, "StickyNotes", "ReminderTime", "TEXT");
+                            Debug.WriteLine(MSG_ADD_COLUMN_REMINDER_TIME);
+                            AddColumn(Con, "StickyNotes", "ReminderTime", "TEXT");
                         }
 
                         // 既存データの移行処理
-                        MigrateImageData(con);
+                        MigrateImageData(Con);
                     }
                 } //← usingを抜けると自動的にclose
 
-                System.Diagnostics.Debug.WriteLine("データベース初期化完了");
+                Debug.WriteLine(MSG_DBINIT_COMPLETE);
             }
-            catch (Exception ex)
+            catch (Exception Ex)
             {
-                System.Diagnostics.Debug.WriteLine($"データベース初期化エラー: {ex.Message}");
-                throw new Exception($"データベース初期化エラー: {ex.Message}", ex);
+                Debug.WriteLine(string.Format(MSG_DBINIT_ERROR, Ex.Message));
+                throw new Exception(string.Format(MSG_DBINIT_ERROR, Ex.Message), Ex);
             }
         }
 
         /// <summary>
         /// 既存の画像データを新しい構造に移行
         /// </summary>
-        private static void MigrateImageData(SqliteConnection con)
+        private static void MigrateImageData(SqliteConnection Con)
         {
             try
             {
                 // ImagePathにデータがあり、OriginalImagePathが空のレコードを移行
-                string sql = @"
+                string Sql = @"
                     UPDATE StickyNotes 
                     SET OriginalImagePath = ImagePath 
                     WHERE ImagePath IS NOT NULL 
                       AND ImagePath != '' 
                       AND (OriginalImagePath IS NULL OR OriginalImagePath = '')";
 
-                using (var cmd = new SqliteCommand(sql, con))
+                using (var Cmd = new SqliteCommand(Sql, Con))
                 {
-                    int count = cmd.ExecuteNonQuery();
-                    if (count > 0)
+                    int Count = Cmd.ExecuteNonQuery();
+                    if (Count > 0)
                     {
-                        System.Diagnostics.Debug.WriteLine($"画像データを移行しました: {count}件");
+                        Debug.WriteLine(string.Format(MSG_IMAGE_MIGRATE_COUNT, Count));
                     }
                 }
             }
-            catch (Exception ex)
+            catch (Exception Ex)
             {
-                System.Diagnostics.Debug.WriteLine($"画像データ移行エラー: {ex.Message}");
+                Debug.WriteLine(string.Format(MSG_IMAGE_MIGRATE_ERROR, Ex.Message));
                 // エラーが発生してもアプリは続行
             }
         }
@@ -176,16 +204,16 @@ namespace StickyNoteApp
         /// <summary>
         /// テーブルの存在確認
         /// </summary>
-        public static bool TableExists(SqliteConnection con, string tableName)
+        public static bool TableExists(SqliteConnection Con, string TableName)
         {
-            string sql = "SELECT name FROM sqlite_master WHERE type='table' AND name=$tableName";
+            string Sql = "SELECT name FROM sqlite_master WHERE type='table' AND name=$tableName";
 
-            using (var cmd = new SqliteCommand(sql, con))
+            using (var Cmd = new SqliteCommand(Sql, Con))
             {
-                cmd.Parameters.AddWithValue("$tableName", tableName);
-                using (var reader = cmd.ExecuteReader())
+                Cmd.Parameters.AddWithValue("$tableName", TableName);
+                using (var Reader = Cmd.ExecuteReader())
                 {
-                    return reader.HasRows;
+                    return Reader.HasRows;
                 }
             }
         }
@@ -193,16 +221,16 @@ namespace StickyNoteApp
         /// <summary>
         /// カラムの存在確認
         /// </summary>
-        private static bool ColumnExists(SqliteConnection con, string tableName, string columnName)
+        private static bool ColumnExists(SqliteConnection Con, string TableName, string ColumnName)
         {
-            string sql = $"PRAGMA table_info({tableName})";
+            string Sql = $"PRAGMA table_info({TableName})";
 
-            using (var cmd = new SqliteCommand(sql, con))
-            using (var reader = cmd.ExecuteReader())
+            using (var Cmd = new SqliteCommand(Sql, Con))
+            using (var Reader = Cmd.ExecuteReader())
             {
-                while (reader.Read())
+                while (Reader.Read())
                 {
-                    if (reader["name"].ToString() == columnName)
+                    if (Reader["name"].ToString() == ColumnName)
                     {
                         return true;
                     }
@@ -215,22 +243,22 @@ namespace StickyNoteApp
         /// <summary>
         /// カラムを追加(汎用)
         /// </summary>
-        private static void AddColumn(SqliteConnection con, string tableName, string columnName, string columnType)
+        private static void AddColumn(SqliteConnection Con, string TableName, string ColumnName, string ColumnType)
         {
-            string sql = $"ALTER TABLE {tableName} ADD COLUMN {columnName} {columnType}";
-            using (var cmd = new SqliteCommand(sql, con))
+            string Sql = $"ALTER TABLE {TableName} ADD COLUMN {ColumnName} {ColumnType}";
+            using (var Cmd = new SqliteCommand(Sql, Con))
             {
-                cmd.ExecuteNonQuery();
-                System.Diagnostics.Debug.WriteLine($"{columnName}カラム追加完了");
+                Cmd.ExecuteNonQuery();
+                Debug.WriteLine(string.Format(MSG_COLUMN_ADDED, ColumnName));
             }
         }
 
         /// <summary>
         /// StickyNotesテーブルの作成(画像関連追加)
         /// </summary>
-        private static void CreateStickyNotesTable(SqliteConnection con)
+        private static void CreateStickyNotesTable(SqliteConnection Con)
         {
-            string sql = @"
+            string Sql = @"
                 CREATE TABLE StickyNotes (
                     Id TEXT PRIMARY KEY,
                     Content TEXT,
@@ -253,33 +281,34 @@ namespace StickyNoteApp
                     UpdatedAt TEXT
                 );
             ";
-            using (var cmd = new SqliteCommand(sql, con))
+            using (var Cmd = new SqliteCommand(Sql, Con))
             {
-                cmd.ExecuteNonQuery();
-                System.Diagnostics.Debug.WriteLine("StickyNotesテーブル作成完了");
+                Cmd.ExecuteNonQuery();
+                Debug.WriteLine(MSG_TABLE_CREATED);
             }
         }
 
         /// <summary>
-        /// SQLパラメータの設定(INSERT or UPDATE 用)
+        /// 付箋データを保存または更新(INSERT or UPDATE用)
         /// </summary>
-        public static void SaveOrUpdate(StickyNoteForm note)
+        public static void SaveOrUpdate(StickyNoteForm Note)
         {
             // 復元中は保存しない
             if (Common.IsRestoring)
             {
-                System.Diagnostics.Debug.WriteLine("[SaveOrUpdate] 復元中のため保存をスキップ");
+                Debug.WriteLine(MSG_SKIP_SAVE_RESTORING);
                 return;
             }
-            //  順番待ち処理（ロックエラー防止）
-            lock (saveLock)
+
+            // 順番待ち処理（ロックエラー防止）
+            lock (SaveLock)
             {
                 try
                 {
-                    using (SqliteConnection con = OpenConnection()) // ← 変更
+                    using (SqliteConnection Con = OpenConnection())
                     {
                         // UPSERTクエリ(画像関連追加）
-                        string sql = @"
+                        string Sql = @"
                             INSERT INTO StickyNotes
                             (Id, Content, PosX, PosY, Width, Height, BgR, BgG, BgB, TopMostFlag, DeleteFlag, 
                              ImagePath, OriginalImagePath, ResizedImagePath, ImageDisplayHeight,
@@ -308,41 +337,41 @@ namespace StickyNoteApp
                         ";
 
                         // UPSERT用SQLパラメータ（付箋データ）の設定
-                        using (var cmd = new SqliteCommand(sql, con))
+                        using (var Cmd = new SqliteCommand(Sql, Con))
                         {
-                            cmd.Parameters.AddWithValue("$Id", note.NoteId);
-                            cmd.Parameters.AddWithValue("$Content", string.IsNullOrEmpty(note.txtNote.Text) ? "" : note.txtNote.Text);
-                            cmd.Parameters.AddWithValue("$PosX", note.Left);
-                            cmd.Parameters.AddWithValue("$PosY", note.Top);
-                            cmd.Parameters.AddWithValue("$Width", note.Width);
-                            cmd.Parameters.AddWithValue("$Height", note.Height);
-                            cmd.Parameters.AddWithValue("$BgR", note.BackColor.R);
-                            cmd.Parameters.AddWithValue("$BgG", note.BackColor.G);
-                            cmd.Parameters.AddWithValue("$BgB", note.BackColor.B);
-                            cmd.Parameters.AddWithValue("$TopMostFlag", note.TopMost ? 1 : 0);
+                            Cmd.Parameters.AddWithValue("$Id", Note.NoteId);
+                            Cmd.Parameters.AddWithValue("$Content", string.IsNullOrEmpty(Note.txtNote.Text) ? "" : Note.txtNote.Text);
+                            Cmd.Parameters.AddWithValue("$PosX", Note.Left);
+                            Cmd.Parameters.AddWithValue("$PosY", Note.Top);
+                            Cmd.Parameters.AddWithValue("$Width", Note.Width);
+                            Cmd.Parameters.AddWithValue("$Height", Note.Height);
+                            Cmd.Parameters.AddWithValue("$BgR", Note.BackColor.R);
+                            Cmd.Parameters.AddWithValue("$BgG", Note.BackColor.G);
+                            Cmd.Parameters.AddWithValue("$BgB", Note.BackColor.B);
+                            Cmd.Parameters.AddWithValue("$TopMostFlag", Note.TopMost ? 1 : 0);
 
                             // 画像関連パラメータ
-                            cmd.Parameters.AddWithValue("$ImagePath", string.IsNullOrEmpty(note.CapturedImagePath) ? "" : note.CapturedImagePath);
-                            cmd.Parameters.AddWithValue("$OriginalImagePath", string.IsNullOrEmpty(note.OriginalImagePath) ? "" : note.OriginalImagePath);
-                            cmd.Parameters.AddWithValue("$ResizedImagePath", string.IsNullOrEmpty(note.ResizedImagePath) ? "" : note.ResizedImagePath);
-                            cmd.Parameters.AddWithValue("$ImageDisplayHeight", note.ImageDisplayHeight);
+                            Cmd.Parameters.AddWithValue("$ImagePath", string.IsNullOrEmpty(Note.CapturedImagePath) ? "" : Note.CapturedImagePath);
+                            Cmd.Parameters.AddWithValue("$OriginalImagePath", string.IsNullOrEmpty(Note.OriginalImagePath) ? "" : Note.OriginalImagePath);
+                            Cmd.Parameters.AddWithValue("$ResizedImagePath", string.IsNullOrEmpty(Note.ResizedImagePath) ? "" : Note.ResizedImagePath);
+                            Cmd.Parameters.AddWithValue("$ImageDisplayHeight", Note.ImageDisplayHeight);
 
                             // リマインダー情報を保存
-                            var reminderInfo = note.GetReminderInfo();
-                            cmd.Parameters.AddWithValue("$ReminderActive", reminderInfo.IsActive ? 1 : 0);
-                            cmd.Parameters.AddWithValue("$ReminderTime", reminderInfo.IsActive ? reminderInfo.ReminderTime.ToString("yyyy-MM-dd HH:mm:ss") : "");
+                            var ReminderInfo = Note.GetReminderInfo();
+                            Cmd.Parameters.AddWithValue("$ReminderActive", ReminderInfo.IsActive ? 1 : 0);
+                            Cmd.Parameters.AddWithValue("$ReminderTime", ReminderInfo.IsActive ? ReminderInfo.ReminderTime.ToString(DATE_TIME_FORMAT) : "");
 
-                            cmd.Parameters.AddWithValue("$CreatedAt", note.CreatedAt);
-                            cmd.Parameters.AddWithValue("$UpdatedAt", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+                            Cmd.Parameters.AddWithValue("$CreatedAt", Note.CreatedAt);
+                            Cmd.Parameters.AddWithValue("$UpdatedAt", DateTime.Now.ToString(DATE_TIME_FORMAT));
 
-                            // INSERTまたはUPDATE を実行 
-                            cmd.ExecuteNonQuery();
+                            // INSERTまたはUPDATE を実行
+                            Cmd.ExecuteNonQuery();
                         }
                     } //← usingを抜けるとclose
                 }
-                catch (Exception ex)
+                catch (Exception Ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"データ保存エラー: {ex.Message}");
+                    Debug.WriteLine(string.Format(MSG_SAVE_ERROR, Ex.Message));
                 }
             }
         }
@@ -350,35 +379,35 @@ namespace StickyNoteApp
         /// <summary>
         /// 付箋データを論理削除(DeleteFlag を 1 に設定)
         /// </summary>
-        public static void SoftDelete(string id)
+        public static void SoftDelete(string Id)
         {
             // 復元中は削除しない
             if (Common.IsRestoring)
             {
-                System.Diagnostics.Debug.WriteLine("[SoftDelete] 復元中のため削除をスキップ");
+                Debug.WriteLine(MSG_SKIP_DELETE_RESTORING);
                 return;
             }
 
             // 順番待ち処理（ロックエラー防止）
-            lock (saveLock)
+            lock (SaveLock)
             {
                 try
                 {
-                    using (SqliteConnection con = OpenConnection()) // ← 変更
+                    using (SqliteConnection Con = OpenConnection())
                     {
-                        string sql = @"UPDATE StickyNotes SET DeleteFlag = 1, UpdatedAt = $UpdatedAt WHERE Id = $Id";
+                        string Sql = @"UPDATE StickyNotes SET DeleteFlag = 1, UpdatedAt = $UpdatedAt WHERE Id = $Id";
 
-                        using (var cmd = new SqliteCommand(sql, con))
+                        using (var Cmd = new SqliteCommand(Sql, Con))
                         {
-                            cmd.Parameters.AddWithValue("$Id", id);
-                            cmd.Parameters.AddWithValue("$UpdatedAt", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
-                            cmd.ExecuteNonQuery();
+                            Cmd.Parameters.AddWithValue("$Id", Id);
+                            Cmd.Parameters.AddWithValue("$UpdatedAt", DateTime.Now.ToString(DATE_TIME_FORMAT));
+                            Cmd.ExecuteNonQuery();
                         }
                     } //← using を抜けると close
                 }
-                catch (Exception ex)
+                catch (Exception Ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"データ削除エラー: {ex.Message}");
+                    Debug.WriteLine(string.Format(MSG_DELETE_ERROR, Ex.Message));
                 }
             }
         }
@@ -389,57 +418,57 @@ namespace StickyNoteApp
         /// </summary>
         public static List<StickyNoteData> LoadAll()
         {
-            var notes = new List<StickyNoteData>();
+            var Notes = new List<StickyNoteData>();
 
             try
             {
-                using (SqliteConnection con = OpenConnection()) // ← 変更
+                using (SqliteConnection Con = OpenConnection())
                 {
-                    using (var cmd = con.CreateCommand())
+                    using (var Cmd = Con.CreateCommand())
                     {
-                        cmd.CommandText = "SELECT * FROM StickyNotes WHERE DeleteFlag = 0 ORDER BY CreatedAt ASC";
+                        Cmd.CommandText = "SELECT * FROM StickyNotes WHERE DeleteFlag = 0 ORDER BY CreatedAt ASC";
 
-                        using (var reader = cmd.ExecuteReader())
+                        using (var Reader = Cmd.ExecuteReader())
                         {
-                            while (reader.Read())
+                            while (Reader.Read())
                             {
-                                var noteData = new StickyNoteData
+                                var NoteData = new StickyNoteData
                                 {
-                                    Id = reader["Id"].ToString(),
-                                    Content = reader["Content"].ToString(),
-                                    PosX = Convert.ToInt32(reader["PosX"]),
-                                    PosY = Convert.ToInt32(reader["PosY"]),
-                                    Width = Convert.ToInt32(reader["Width"]),
-                                    Height = Convert.ToInt32(reader["Height"]),
-                                    BgR = Convert.ToInt32(reader["BgR"]),
-                                    BgG = Convert.ToInt32(reader["BgG"]),
-                                    BgB = Convert.ToInt32(reader["BgB"]),
-                                    TopMostFlag = Convert.ToInt32(reader["TopMostFlag"]),
-                                    ImagePath = reader["ImagePath"]?.ToString(),
-                                    OriginalImagePath = reader["OriginalImagePath"]?.ToString(),
-                                    ResizedImagePath = reader["ResizedImagePath"]?.ToString(),
-                                    ImageDisplayHeight = reader["ImageDisplayHeight"] != DBNull.Value
-                                        ? Convert.ToInt32(reader["ImageDisplayHeight"])
+                                    Id = Reader["Id"].ToString(),
+                                    Content = Reader["Content"].ToString(),
+                                    PosX = Convert.ToInt32(Reader["PosX"]),
+                                    PosY = Convert.ToInt32(Reader["PosY"]),
+                                    Width = Convert.ToInt32(Reader["Width"]),
+                                    Height = Convert.ToInt32(Reader["Height"]),
+                                    BgR = Convert.ToInt32(Reader["BgR"]),
+                                    BgG = Convert.ToInt32(Reader["BgG"]),
+                                    BgB = Convert.ToInt32(Reader["BgB"]),
+                                    TopMostFlag = Convert.ToInt32(Reader["TopMostFlag"]),
+                                    ImagePath = Reader["ImagePath"]?.ToString(),
+                                    OriginalImagePath = Reader["OriginalImagePath"]?.ToString(),
+                                    ResizedImagePath = Reader["ResizedImagePath"]?.ToString(),
+                                    ImageDisplayHeight = Reader["ImageDisplayHeight"] != DBNull.Value
+                                        ? Convert.ToInt32(Reader["ImageDisplayHeight"])
                                         : 0,
-                                    ReminderActive = reader["ReminderActive"] != DBNull.Value
-                                        ? Convert.ToInt32(reader["ReminderActive"])
+                                    ReminderActive = Reader["ReminderActive"] != DBNull.Value
+                                        ? Convert.ToInt32(Reader["ReminderActive"])
                                         : 0,
-                                    ReminderTime = reader["ReminderTime"]?.ToString(),
-                                    CreatedAt = reader["CreatedAt"].ToString()
+                                    ReminderTime = Reader["ReminderTime"]?.ToString(),
+                                    CreatedAt = Reader["CreatedAt"].ToString()
                                 };
 
-                                notes.Add(noteData);
+                                Notes.Add(NoteData);
                             }
                         }
                     }
                 } // ← usingを抜けると確実にcloseされる
 
-                System.Diagnostics.Debug.WriteLine($"データベースから{notes.Count}件の付箋を読み込みました");
-                return notes;
+                Debug.WriteLine(string.Format(MSG_LOAD_COUNT, Notes.Count));
+                return Notes;
             }
-            catch (Exception ex)
+            catch (Exception Ex)
             {
-                throw new Exception($"データ読み込みエラー: {ex.Message}", ex);
+                throw new Exception(string.Format(MSG_LOAD_ERROR, Ex.Message), Ex);
             }
         }
     } // ← Databaseクラスの終わり

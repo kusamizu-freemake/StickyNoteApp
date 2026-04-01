@@ -1,5 +1,7 @@
 using System;
+using System.Diagnostics;
 using System.Drawing;
+using System.Drawing.Imaging;
 using System.IO;
 using System.Windows.Forms;
 
@@ -12,32 +14,63 @@ namespace StickyNoteApp
     public class ImageManager
     {
         // 定数定義
+        // 数値定数
         private const int DEFAULT_IMAGE_HEIGHT = 150;
         private const int IMAGE_LEFT_MARGIN = 0;
         private const long MAX_FILE_SIZE_BYTES = 2 * 1024 * 1024; // 2MB
-
-        // テキスト領域の最小高さを確保
         private const int MIN_TEXT_AREA_HEIGHT = 80; // テキストが見えるための最小高さ
+        private const int DEFAULT_TITLE_BAR_HEIGHT = 40;
+        private const int DELETE_RETRY_WAIT_MS = 100;
 
-        private readonly StickyNoteForm parentForm;
-        private readonly PictureBox pictureBox;
+        // ファイル関連定数
+        private const string IMAGE_FOLDER_NAME = "Images";
+        private const string APP_FOLDER_NAME = "StickyNoteApp";
+        private const string ORIGINAL_FILE_NAME_FORMAT = "{0}_original_{1:yyyyMMddHHmmss}{2}";
+        private const string EXT_GIF = ".gif";
+        private const string EXT_PNG = ".png";
+
+        // ログメッセージ定数
+        private const string MSG_DELETE_FILE_ERROR = "画像ファイル削除時にエラーが発生: {0}";
+        private const string MSG_DELETE_SUCCESS = "画像削除成功: {0}";
+        private const string MSG_DELETE_RETRY = "画像削除リトライ {0}/{1}: {2}";
+        private const string MSG_DELETE_FINAL_FAIL = "画像削除失敗（最終リトライ）: {0} - {1}";
+        private const string MSG_LOAD_ERROR = "画像読み込みエラー: {0}";
+        private const string MSG_AUTO_ADJUST = "付箋サイズを自動調整: {0}px (画像: {1}px, テキスト領域: {2}px確保)";
+
+        // ダイアログ・メッセージ定数
+        private const string MSG_FILE_SIZE_OVER = "選択した画像ファイルのサイズが大きすぎます。\nファイルサイズ: {0:F2}MB\n最大サイズ: 2MB\n\n2MB以下の画像ファイルを選択してください。";
+        private const string TITLE_FILE_SIZE_ERROR = "ファイルサイズエラー";
+        private const string MSG_LOAD_SUCCESS = "画像を読み込みました。";
+        private const string TITLE_COMPLETE = "完了";
+        private const string MSG_LOAD_FAILED = "画像の読み込みに失敗しました:\n{0}";
+        private const string TITLE_ERROR = "エラー";
+
+        // ファイルダイアログ定数
+        private const string FILTER_OPEN_IMAGE = "画像ファイル|*.png;*.jpg;*.jpeg;*.gif|PNGファイル|*.png|JPEGファイル|*.jpg;*.jpeg|GIFファイル|*.gif|すべてのファイル|*.*";
+        private const string TITLE_OPEN_IMAGE = "画像を選択";
+
+        // コントロール名定数
+        private const string CONTROL_TITLE_BAR = "titleBar";
+
+        private readonly StickyNoteForm ParentForm;
+        private readonly PictureBox PictureBox;
 
         // 画像パス管理
-        private string originalImagePath;      // 元画像のパス
-        private string resizedImagePath;       // リサイズ済み画像のパス
-        private int imageDisplayHeight = 150;  // 画像表示高さ
+        private string OriginalImagePathValue;                           // 元画像のパス
+        private string ResizedImagePathValue;                            // リサイズ済み画像のパス
+        private int ImageDisplayHeightValue = DEFAULT_IMAGE_HEIGHT;   // 画像表示高さ
 
-        public string OriginalImagePath => originalImagePath;
-        public string ResizedImagePath => resizedImagePath;
-        public int ImageDisplayHeight => imageDisplayHeight;
-        public string CapturedImagePath => resizedImagePath ?? originalImagePath; // 互換性
+        public string OriginalImagePath => OriginalImagePathValue;
+        public string ResizedImagePath => ResizedImagePathValue;
+        public int ImageDisplayHeight => ImageDisplayHeightValue;
+        public string CapturedImagePath => ResizedImagePathValue ?? OriginalImagePathValue; // 互換性
 
         /// <summary>
         /// 画像の表示高さを更新する（ImageResizeManagerから呼び出し）
         /// </summary>
-        public void SetImageDisplayHeight(int height)
+        public void SetImageDisplayHeight(int Height)
         {
-            imageDisplayHeight = height;
+            ImageDisplayHeightValue = Height;
         }
 
         /// <summary>
@@ -45,7 +78,7 @@ namespace StickyNoteApp
         /// </summary>
         public string GetOriginalImagePath()
         {
-            return originalImagePath;
+            return OriginalImagePathValue;
         }
 
         /// <summary>
@@ -53,26 +86,25 @@ namespace StickyNoteApp
         /// </summary>
         public string GetResizedImagePath()
         {
-            return resizedImagePath;
+            return ResizedImagePathValue;
         }
 
         /// <summary>
         /// リサイズ済み画像のパスを設定する
         /// </summary>
-        public void SetResizedImagePath(string path)
+        public void SetResizedImagePath(string Path)
         {
-            resizedImagePath = path;
+            ResizedImagePathValue = Path;
         }
 
         /// <summary>
         /// コンストラクタ
         /// </summary>
-        public ImageManager(StickyNoteForm form, PictureBox picBox)
+        public ImageManager(StickyNoteForm Form, PictureBox PicBox)
         {
-            parentForm = form;
-            pictureBox = picBox;
+            ParentForm = Form;
+            PictureBox = PicBox;
         }
-
 
         /// <summary>
         /// ファイルから画像を選択して読み込み
@@ -81,76 +113,65 @@ namespace StickyNoteApp
         {
             try
             {
-                using (var openDialog = new OpenFileDialog())
+                using (var OpenDialog = new OpenFileDialog())
                 {
-                    openDialog.Filter = "画像ファイル|*.png;*.jpg;*.jpeg;*.gif|" +
-                                       "PNGファイル|*.png|" +
-                                       "JPEGファイル|*.jpg;*.jpeg|" +
-                                       "GIFファイル|*.gif|" +
-                                       "すべてのファイル|*.*";
-                    openDialog.Title = "画像を選択";
-                    openDialog.Multiselect = false;
+                    OpenDialog.Filter = FILTER_OPEN_IMAGE;
+                    OpenDialog.Title = TITLE_OPEN_IMAGE;
+                    OpenDialog.Multiselect = false;
 
-                    if (openDialog.ShowDialog() == DialogResult.OK)
+                    if (OpenDialog.ShowDialog() == DialogResult.OK)
                     {
                         // ファイルサイズをチェック
-                        FileInfo fileInfo = new FileInfo(openDialog.FileName);
-                        if (fileInfo.Length > MAX_FILE_SIZE_BYTES)
+                        FileInfo FileInfo = new FileInfo(OpenDialog.FileName);
+                        if (FileInfo.Length > MAX_FILE_SIZE_BYTES)
                         {
-                            double fileSizeMB = fileInfo.Length / (1024.0 * 1024.0);
+                            double FileSizeMB = FileInfo.Length / (1024.0 * 1024.0);
                             // サイズ超過の警告(小数点以下2桁まで表示 )
                             MessageBox.Show(
-                                $"選択した画像ファイルのサイズが大きすぎます。\n" +
-                                $"ファイルサイズ: {fileSizeMB:F2}MB\n" +
-                                $"最大サイズ: 2MB\n\n" +
-                                $"2MB以下の画像ファイルを選択してください。",
-                                "ファイルサイズエラー",
+                                string.Format(MSG_FILE_SIZE_OVER, FileSizeMB),
+                                TITLE_FILE_SIZE_ERROR,
                                 MessageBoxButtons.OK,
                                 MessageBoxIcon.Warning);
                             return;
                         }
 
                         // 画像を読み込み
-                        using (var originalImage = Image.FromFile(openDialog.FileName))
+                        using (var OriginalImage = Image.FromFile(OpenDialog.FileName))
                         {
                             // Bitmapに変換してコピー
-                            Bitmap bitmap = new Bitmap(originalImage);
+                            Bitmap BitmapImg = new Bitmap(OriginalImage);
 
                             // 既存の画像を削除
                             RemoveImageInternal();
 
                             // 元画像として保存
-                            string imagePath = SaveOriginalImage(bitmap, openDialog.FileName);
-                            originalImagePath = imagePath;
-                            resizedImagePath = null;
+                            string ImagePath = SaveOriginalImage(BitmapImg, OpenDialog.FileName);
+                            OriginalImagePathValue = ImagePath;
+                            ResizedImagePathValue = null;
 
                             // PictureBoxに表示
-                            LoadImageToPictureBox(imagePath);
-                            pictureBox.Height = DEFAULT_IMAGE_HEIGHT;
-                            pictureBox.Visible = true;
-                            imageDisplayHeight = DEFAULT_IMAGE_HEIGHT;
+                            LoadImageToPictureBox(ImagePath);
+                            PictureBox.Height = DEFAULT_IMAGE_HEIGHT;
+                            PictureBox.Visible = true;
+                            ImageDisplayHeightValue = DEFAULT_IMAGE_HEIGHT;
 
                             // テキストボックスの位置を調整し、必要に応じて付箋サイズを拡大
                             AdjustTextBoxPosition();
                             EnsureTextAreaVisible();
 
                             // 画像読み込み完了時に保存
-                            parentForm.SaveCurrentNoteState();
+                            ParentForm.SaveCurrentNoteState();
 
-                            MessageBox.Show(
-                                "画像を読み込みました。",
-                                "完了",
-                                MessageBoxButtons.OK,
-                                MessageBoxIcon.Information);
+                            MessageBox.Show(MSG_LOAD_SUCCESS, TITLE_COMPLETE, MessageBoxButtons.OK, MessageBoxIcon.Information);
                         }
                     }
                 }
             }
-            catch (Exception ex)
+            catch (Exception Ex)
             {
                 MessageBox.Show(
-                    $"画像の読み込みに失敗しました:\n{ex.Message}",
-                    "エラー",
+                    string.Format(MSG_LOAD_FAILED, Ex.Message),
+                    TITLE_ERROR,
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
             }
@@ -161,14 +182,14 @@ namespace StickyNoteApp
         /// </summary>
         private void RemoveImageInternal()
         {
-            if (pictureBox.Image != null)
+            if (PictureBox.Image != null)
             {
                 // アニメーションを停止
-                ImageAnimator.StopAnimate(pictureBox.Image, OnFrameChanged);
+                ImageAnimator.StopAnimate(PictureBox.Image, OnFrameChanged);
 
-                var Image = pictureBox.Image;
-                pictureBox.Image = null;
-                Image.Dispose();
+                var Img = PictureBox.Image;
+                PictureBox.Image = null;
+                Img.Dispose();
             }
         }
 
@@ -178,160 +199,157 @@ namespace StickyNoteApp
         public void RemoveImage()
         {
             // 先に画像を解放（順序が重要）
-            if (pictureBox.Image != null)
+            if (PictureBox.Image != null)
             {
                 // アニメーションを停止
-                ImageAnimator.StopAnimate(pictureBox.Image, OnFrameChanged);
+                ImageAnimator.StopAnimate(PictureBox.Image, OnFrameChanged);
 
-                var image = pictureBox.Image;
-                pictureBox.Image = null;
-                image.Dispose();
+                var Img = PictureBox.Image;
+                PictureBox.Image = null;
+                Img.Dispose();
             }
 
-            pictureBox.Height = 0;
-            pictureBox.Visible = false;
+            PictureBox.Height = 0;
+            PictureBox.Visible = false;
 
             // ファイル削除（リトライ機能付き）
             try
             {
-                DeleteImageFileWithRetry(originalImagePath);
-                DeleteImageFileWithRetry(resizedImagePath);
+                DeleteImageFileWithRetry(OriginalImagePathValue);
+                DeleteImageFileWithRetry(ResizedImagePathValue);
             }
-            catch (Exception ex)
+            catch (Exception Ex)
             {
-                System.Diagnostics.Debug.WriteLine($"画像ファイル削除時にエラーが発生: {ex.Message}");
+                Debug.WriteLine(string.Format(MSG_DELETE_FILE_ERROR, Ex.Message));
             }
 
-            originalImagePath = null;
-            resizedImagePath = null;
-            imageDisplayHeight = 150;
+            OriginalImagePathValue = null;
+            ResizedImagePathValue = null;
+            ImageDisplayHeightValue = DEFAULT_IMAGE_HEIGHT;
 
             // テキストボックスの位置を調整
-            parentForm.txtNote.Dock = DockStyle.Fill;
+            ParentForm.txtNote.Dock = DockStyle.Fill;
 
             // 画像削除完了時に保存
-            parentForm.SaveCurrentNoteState();
+            ParentForm.SaveCurrentNoteState();
         }
 
         /// <summary>
         /// 画像を復元（データベースから読み込み時用）
         /// </summary>
-        public void LoadImage(string imagePath, string originalPath, string resizedPath, int displayHeight)
+        public void LoadImage(string ImagePath, string OriginalPath, string ResizedPath, int DisplayHeight)
         {
             try
             {
-                originalImagePath = originalPath;
-                resizedImagePath = resizedPath;
-                imageDisplayHeight = displayHeight > 0 ? displayHeight : DEFAULT_IMAGE_HEIGHT;
+                OriginalImagePathValue = OriginalPath;
+                ResizedImagePathValue = ResizedPath;
+                ImageDisplayHeightValue = DisplayHeight > 0 ? DisplayHeight : DEFAULT_IMAGE_HEIGHT;
 
                 // 表示する画像を決定
-                string imageToLoad = null;
-                if (!string.IsNullOrEmpty(resizedPath) && File.Exists(resizedPath))
+                string ImageToLoad = null;
+                if (!string.IsNullOrEmpty(ResizedPath) && File.Exists(ResizedPath))
                 {
-                    imageToLoad = resizedPath;
+                    ImageToLoad = ResizedPath;
                 }
-                else if (!string.IsNullOrEmpty(originalPath) && File.Exists(originalPath))
+                else if (!string.IsNullOrEmpty(OriginalPath) && File.Exists(OriginalPath))
                 {
-                    imageToLoad = originalPath;
+                    ImageToLoad = OriginalPath;
                 }
-                else if (!string.IsNullOrEmpty(imagePath) && File.Exists(imagePath))
+                else if (!string.IsNullOrEmpty(ImagePath) && File.Exists(ImagePath))
                 {
-                    imageToLoad = imagePath;
-                    originalImagePath = imagePath;
+                    ImageToLoad = ImagePath;
+                    OriginalImagePathValue = ImagePath;
                 }
 
-                if (!string.IsNullOrEmpty(imageToLoad))
+                if (!string.IsNullOrEmpty(ImageToLoad))
                 {
                     // 自動的にアニメーションが開始
-                    LoadImageToPictureBox(imageToLoad);
-                    pictureBox.Height = imageDisplayHeight;
-                    pictureBox.Visible = true;
+                    LoadImageToPictureBox(ImageToLoad);
+                    PictureBox.Height = ImageDisplayHeightValue;
+                    PictureBox.Visible = true;
 
-                    // テキストボックスの位置を調整
                     AdjustTextBoxPosition();
                     // 復元時も必要に応じて付箋サイズを調整
                     EnsureTextAreaVisible();
                 }
             }
-            catch (Exception ex)
+            catch (Exception Ex)
             {
-                System.Diagnostics.Debug.WriteLine($"画像読み込みエラー: {ex.Message}");
+                Debug.WriteLine(string.Format(MSG_LOAD_ERROR, Ex.Message));
             }
         }
 
         /// <summary>
         /// 元画像をファイルとして保存
         /// </summary>
-        private string SaveOriginalImage(Bitmap image, string sourceFilePath)
+        private string SaveOriginalImage(Bitmap Image, string SourceFilePath)
         {
-            string folder = Path.Combine(
+            string Folder = System.IO.Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "StickyNoteApp",
-                "Images"
+                APP_FOLDER_NAME,
+                IMAGE_FOLDER_NAME
             );
 
-            if (!Directory.Exists(folder))
+            if (!Directory.Exists(Folder))
             {
-                Directory.CreateDirectory(folder);
+                Directory.CreateDirectory(Folder);
             }
 
             // ファイル拡張子を取得（GIFの場合はGIFで保存）
-            string sourceExt = Path.GetExtension(sourceFilePath).ToLower();
-            string ext = (sourceExt == ".gif") ? ".gif" : ".png";
+            string SourceExt = System.IO.Path.GetExtension(SourceFilePath).ToLower();
+            string Ext = (SourceExt == EXT_GIF) ? EXT_GIF : EXT_PNG;
 
-            string fileName = $"{parentForm.NoteId}_original_{DateTime.Now:yyyyMMddHHmmss}{ext}";
-            string filePath = Path.Combine(folder, fileName);
+            string FileName = string.Format(ORIGINAL_FILE_NAME_FORMAT, ParentForm.NoteId, DateTime.Now, Ext);
+            string FilePath = System.IO.Path.Combine(Folder, FileName);
 
             // GIFの場合は元ファイルをコピー（アニメーション情報を保持）
-            if (sourceExt == ".gif")
+            if (SourceExt == EXT_GIF)
             {
-                File.Copy(sourceFilePath, filePath, true);
+                File.Copy(SourceFilePath, FilePath, true);
             }
             else
             {
-                image.Save(filePath, System.Drawing.Imaging.ImageFormat.Png);
+                Image.Save(FilePath, ImageFormat.Png);
             }
 
-            return filePath;
+            return FilePath;
         }
 
         /// <summary>
         /// PictureBoxに画像を読み込み、アニメーションGIFに対応
         /// </summary>
-        private void LoadImageToPictureBox(string imagePath)
+        private void LoadImageToPictureBox(string ImagePath)
         {
             // 既存の画像のアニメーションを停止
-            if (pictureBox.Image != null)
+            if (PictureBox.Image != null)
             {
-                ImageAnimator.StopAnimate(pictureBox.Image, OnFrameChanged);
-                pictureBox.Image.Dispose();
+                ImageAnimator.StopAnimate(PictureBox.Image, OnFrameChanged);
+                PictureBox.Image.Dispose();
             }
 
             // 新しい画像を読み込み
-            pictureBox.Image = Image.FromFile(imagePath);
+            PictureBox.Image = Image.FromFile(ImagePath);
 
             // アニメーションGIFの場合はアニメーションを開始
-            if (IsAnimatedGif(pictureBox.Image))
+            if (IsAnimatedGif(PictureBox.Image))
             {
-                ImageAnimator.Animate(pictureBox.Image, OnFrameChanged);
+                ImageAnimator.Animate(PictureBox.Image, OnFrameChanged);
             }
         }
 
         /// <summary>
         /// アニメーションGIFかどうかを判定
         /// </summary>
-        private bool IsAnimatedGif(Image image)
+        private bool IsAnimatedGif(Image Img)
         {
-            if (image == null)
-                return false;
+            if (Img == null) return false;
 
-            // GIF形式の番号と一致するか確認
             // 静止画GIFはフレーム数が1, アニメーションGIFはフレーム数が2以上
-            if (image.RawFormat.Guid == System.Drawing.Imaging.ImageFormat.Gif.Guid)
+            if (Img.RawFormat.Guid == ImageFormat.Gif.Guid)
             {
-                var dimension = new System.Drawing.Imaging.FrameDimension(image.FrameDimensionsList[0]);
-                int frameCount = image.GetFrameCount(dimension);
-                return frameCount > 1;
+                var Dimension = new FrameDimension(Img.FrameDimensionsList[0]);
+                int FrameCount = Img.GetFrameCount(Dimension);
+                return FrameCount > 1;
             }
             return false;
         }
@@ -339,48 +357,47 @@ namespace StickyNoteApp
         /// <summary>
         /// アニメーションフレーム更新時のコールバック
         /// </summary>
-        private void OnFrameChanged(object sender, EventArgs e)
+        private void OnFrameChanged(object Sender, EventArgs E)
         {
-            if (pictureBox.InvokeRequired)
+            if (PictureBox.InvokeRequired)
             {
                 // UIスレッドで実行
-                pictureBox.BeginInvoke(new EventHandler(OnFrameChanged), sender, e);
+                PictureBox.BeginInvoke(new EventHandler(OnFrameChanged), Sender, E);
             }
             else
             {
                 // フレームを更新して再描画
-                ImageAnimator.UpdateFrames(pictureBox.Image);
-                //
-                pictureBox.Invalidate();
+                ImageAnimator.UpdateFrames(PictureBox.Image);
+                PictureBox.Invalidate();
             }
         }
 
         /// <summary>
         /// 画像ファイルをリトライ付きで削除
         /// </summary>
-        private void DeleteImageFileWithRetry(string filePath, int maxRetries = 3)
+        private void DeleteImageFileWithRetry(string FilePath, int MaxRetries = 3)
         {
-            if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
+            if (string.IsNullOrEmpty(FilePath) || !File.Exists(FilePath))
                 return;
 
-            for (int i = 0; i < maxRetries; i++)
+            for (int I = 0; I < MaxRetries; I++)
             {
                 try
                 {
-                    File.Delete(filePath);
-                    System.Diagnostics.Debug.WriteLine($"画像削除成功: {filePath}");
+                    File.Delete(FilePath);
+                    Debug.WriteLine(string.Format(MSG_DELETE_SUCCESS, FilePath));
                     return;
                 }
-                catch (IOException ex)
+                catch (IOException Ex)
                 {
-                    if (i < maxRetries - 1)
+                    if (I < MaxRetries - 1)
                     {
-                        System.Diagnostics.Debug.WriteLine($"画像削除リトライ {i + 1}/{maxRetries}: {filePath}");
-                        System.Threading.Thread.Sleep(100);
+                        Debug.WriteLine(string.Format(MSG_DELETE_RETRY, I + 1, MaxRetries, FilePath));
+                        System.Threading.Thread.Sleep(DELETE_RETRY_WAIT_MS);
                     }
                     else
                     {
-                        System.Diagnostics.Debug.WriteLine($"画像削除失敗（最終リトライ）: {filePath} - {ex.Message}");
+                        Debug.WriteLine(string.Format(MSG_DELETE_FINAL_FAIL, FilePath, Ex.Message));
                     }
                 }
             }
@@ -393,17 +410,17 @@ namespace StickyNoteApp
         {
             // 画像が非表示のときは Dock=Fill のまま何もしない
             // Dock を None に変えると txtNote.Top=0 になり,タイトルバーを覆い隠すバグが発生する
-            if (!pictureBox.Visible)
+            if (!PictureBox.Visible)
             {
-                parentForm.txtNote.Dock = DockStyle.Fill;
+                ParentForm.txtNote.Dock = DockStyle.Fill;
                 return;
             }
 
-            parentForm.txtNote.Dock = DockStyle.None;
-            parentForm.txtNote.Top = pictureBox.Bottom;
-            parentForm.txtNote.Left = IMAGE_LEFT_MARGIN;
-            parentForm.txtNote.Width = parentForm.ClientSize.Width;
-            parentForm.txtNote.Height = parentForm.ClientSize.Height - parentForm.txtNote.Top;
+            ParentForm.txtNote.Dock = DockStyle.None;
+            ParentForm.txtNote.Top = PictureBox.Bottom;
+            ParentForm.txtNote.Left = IMAGE_LEFT_MARGIN;
+            ParentForm.txtNote.Width = ParentForm.ClientSize.Width;
+            ParentForm.txtNote.Height = ParentForm.ClientSize.Height - ParentForm.txtNote.Top;
         }
 
         /// <summary>
@@ -413,24 +430,22 @@ namespace StickyNoteApp
         private void EnsureTextAreaVisible()
         {
             // タイトルバーの高さを取得
-            int TitleBarHeight = parentForm.Controls["titleBar"]?.Height ?? 40;
+            int TitleBarHeight = ParentForm.Controls[CONTROL_TITLE_BAR]?.Height ?? DEFAULT_TITLE_BAR_HEIGHT;
 
             // 現在のテキスト領域の高さを計算
-            int CurrentTextHeight = parentForm.ClientSize.Height - TitleBarHeight - pictureBox.Height;
+            int CurrentTextHeight = ParentForm.ClientSize.Height - TitleBarHeight - PictureBox.Height;
 
             // テキスト領域が最小高さより小さい場合、付箋を拡大
             if (CurrentTextHeight < MIN_TEXT_AREA_HEIGHT)
             {
-                int RequiredHeight = TitleBarHeight + pictureBox.Height + MIN_TEXT_AREA_HEIGHT;
-                parentForm.ClientSize = new Size(parentForm.ClientSize.Width, RequiredHeight);
+                int RequiredHeight = TitleBarHeight + PictureBox.Height + MIN_TEXT_AREA_HEIGHT;
+                ParentForm.ClientSize = new Size(ParentForm.ClientSize.Width, RequiredHeight);
 
                 // サイズ変更後、再度テキストボックスの位置を調整
                 AdjustTextBoxPosition();
 
-                System.Diagnostics.Debug.WriteLine(
-                    $"付箋サイズを自動調整: {parentForm.ClientSize.Height}px " +
-                    $"(画像: {pictureBox.Height}px, テキスト領域: {MIN_TEXT_AREA_HEIGHT}px確保)"
-                );
+                Debug.WriteLine(string.Format(MSG_AUTO_ADJUST,
+                    ParentForm.ClientSize.Height, PictureBox.Height, MIN_TEXT_AREA_HEIGHT));
             }
         }
 
@@ -439,14 +454,14 @@ namespace StickyNoteApp
         /// </summary>
         public void Dispose()
         {
-            if (pictureBox != null && pictureBox.Image != null)
+            if (PictureBox != null && PictureBox.Image != null)
             {
                 // アニメーションを停止
-                ImageAnimator.StopAnimate(pictureBox.Image, OnFrameChanged);
+                ImageAnimator.StopAnimate(PictureBox.Image, OnFrameChanged);
 
-                var image = pictureBox.Image;
-                pictureBox.Image = null;
-                image.Dispose();
+                var Img = PictureBox.Image;
+                PictureBox.Image = null;
+                Img.Dispose();
             }
         }
     }

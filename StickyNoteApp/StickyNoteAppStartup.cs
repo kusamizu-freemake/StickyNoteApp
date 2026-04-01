@@ -1,14 +1,21 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace StickyNoteApp
 {
     internal static class StickyNoteAppStartup
     {
+        // 文字列定数
+        private const string MUTEX_NAME = "StickyNoteApp_Mutex";
+        private const string MSG_ALREADY_RUNNING = "すでにアプリが起動しています。";
+        private const string TITLE_DUPLICATE_LAUNCH = "二重起動防止";
+        private const string MSG_DBINIT_START = "Startup: データベース初期化開始";
+        private const string MSG_DBINIT_COMPLATE = "Startup: データベース初期化完了";
+        private const string MSG_DBINIT_ERROR = "データベース初期化エラー:\n{0}";
+        private const string TITLE_STARTUP_ERROR = "起動エラー";
+        private const string MSG_TRAYMANEGER_START = "Startup: TrayManagerForm起動";
+
         /// <summary>
         /// アプリケーションのメイン エントリ ポイントです。
         /// </summary>
@@ -16,12 +23,11 @@ namespace StickyNoteApp
         static void Main()
         {
             // 二重起動防止
-            bool createdNew;
-            using (Mutex mutex = new Mutex(true, "StickyNoteApp_Mutex", out createdNew))
+            using (Mutex Mutex = new Mutex(true, MUTEX_NAME, out bool CreatedNew))
             {
-                if (!createdNew)
+                if (!CreatedNew)
                 {
-                    MessageBox.Show("すでにアプリが起動しています。", "二重起動防止", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show(MSG_ALREADY_RUNNING, TITLE_DUPLICATE_LAUNCH, MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
 
@@ -29,22 +35,21 @@ namespace StickyNoteApp
                 Application.SetCompatibleTextRenderingDefault(false);
             }
 
-
             // データベース初期化
             try
             {
-                System.Diagnostics.Debug.WriteLine("Startup: データベース初期化開始");
+                System.Diagnostics.Debug.WriteLine(MSG_DBINIT_START);
                 Database.InitializeDatabase();
-                System.Diagnostics.Debug.WriteLine("Startup: データベース初期化完了");
+                System.Diagnostics.Debug.WriteLine(MSG_DBINIT_COMPLATE);
             }
-            catch (Exception ex)
+            catch (Exception Ex)
             {
-                MessageBox.Show($"データベース初期化エラー:\n{ex.Message}", "起動エラー", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(string.Format(MSG_DBINIT_ERROR, Ex.Message), TITLE_STARTUP_ERROR, MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return; // エラーの場合は終了
             }
 
             // アプリケーション実行
-            System.Diagnostics.Debug.WriteLine("Startup: TrayManagerForm起動");
+            System.Diagnostics.Debug.WriteLine(MSG_TRAYMANEGER_START);
             Application.Run(new TrayManagerForm());
         }
     }
