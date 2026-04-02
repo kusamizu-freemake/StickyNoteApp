@@ -20,76 +20,49 @@ namespace StickyNoteApp
     public partial class ReminderManager : Form
     {
         // 定数定義
-        // 数値定数
         private const int TIMER_INTERVAL_MS = 1000; // リマインダー時刻を確認する間隔（ミリ秒）
-        private const int MIN_REMINDER_MINUTES = 1;    // リマインダーとして設定できる最小時間（分）
-        private const int MINUTES_PER_HOUR = 60;   // 1時間あたりの分数（計算用）
-        private const int MAX_REMINDER_HOURS = 24;   // リマインダーとして設定できる最大時間（24時間）
+        private const int MIN_REMINDER_MINUTES = 1; // リマインダーとして設定できる最小時間（分）
+        private const int MINUTES_PER_HOUR = 60; // 1時間あたりの分数（計算用）
+        private const int MAX_REMINDER_HOURS = 24; // リマインダーとして設定できる最大時間（24時間）
         private const int MAX_REMINDER_MINUTES = MAX_REMINDER_HOURS * MINUTES_PER_HOUR; // 設定可能な最大時間（1440分＝24時間ちょうどまでOK）
-        private const int COLUMN_NOT_FOUND = -1;   // カラムが見つからない場合の値
-        private const int REMINDER_ENABLED = 1;    // リマインダー有効フラグの値
 
-        // ダイアログタイトル定数
-        private const string TITLE_ERROR = "エラー";
-        private const string TITLE_INPUT_ERROR = "入力エラー";
-        private const string TITLE_REMINDER = "リマインダー";
-        private const string TITLE_REMINDER_SET = "リマインダー設定";
-        private const string TITLE_NOTIFICATION = "付箋リマインダー";
-
-        // メッセージ定数
-        private const string MSG_SET_FAILED = "リマインダーの設定に失敗しました。\n\n{0}";
-        private const string MSG_DIALOG_FAILED = "ダイアログの表示に失敗しました。\n\n{0}";
-        private const string MSG_CANCEL_FAILED = "リマインダーのキャンセルに失敗しました。\n\n{0}";
-        private const string MSG_CANCEL_SUCCESS = "リマインダーをキャンセルしました。";
-        private const string MSG_NO_REMINDER = "設定されているリマインダーはありません。";
-        private const string MSG_NOTIFICATION = "リマインダー通知\n\n{0}";
-        private const string MSG_MIN_MINUTES = "時間は{0}分以上を指定してください。";
-        private const string MSG_MAX_HOURS = "時間は{0}時間({1}分)以内を指定してください。";
-        private const string MSG_NO_NOTE_ID = "付箋IDが指定されていません。";
-        private const string MSG_CONFIRM_SET = "{0}にリマインダーを通知します。\n\n通知時刻: {1:HH:mm:ss}";
-
-        // 時間テキストフォーマット定数
-        private const string TIME_TEXT_HOURS_MINS = "{0}時間{1}分後";
-        private const string TIME_TEXT_HOURS_ONLY = "{0}時間後";
-        private const string TIME_TEXT_MINS_ONLY = "{0}分後";
-
-        // コントロール名定数
-        private const string CONTROL_NUMERIC_HOURS = "NumericUpDownHours";
-        private const string CONTROL_NUMERIC_MINUTES = "NumericUpDownMinutes";
+        private const int COLUMN_NOT_FOUND = -1; // カラムが見つからない場合の値
+        private const int REMINDER_ENABLED = 1; // リマインダー有効フラグの値
 
         // Timerの宣言を明示的にSystem.Windows.Forms.Timerに変更
-        private System.Windows.Forms.Timer ReminderTimer;
-        private DateTime ReminderTimeValue;
-        private string NoteContent;
-        private string NoteId;
-        private bool IsActiveValue = false;
+        private System.Windows.Forms.Timer reminderTimer;
+        private DateTime reminderTime;
+        private string noteContent;
+        private string noteId;
+        private bool isActive = false;
 
         // インスタンス管理用（デバッグ確認用）
-        private static int InstanceCount = 0;
+        private static int instanceCount = 0;
 
         // 親フォーム（StickyNoteForm）への参照。親フォームを覚えておく
-        private StickyNoteForm ParentForm;
+        private StickyNoteForm parentForm;
 
         public event EventHandler ReminderTriggered; // リマインダー発火イベント
 
         /// <summary>
         /// リマインダーが設定されているか
         /// </summary>
-        public bool IsActive => IsActiveValue;
+        public bool IsActive => isActive;
 
         /// <summary>
         /// リマインダー時刻
         /// </summary>
-        public DateTime ReminderTime => ReminderTimeValue;
+        public DateTime ReminderTime => reminderTime;
 
         /// <summary>
         /// コンストラクタ（親フォームを受け取る）
         /// </summary>
-        public ReminderManager(StickyNoteForm Parent)
+        public ReminderManager(StickyNoteForm parent)
         {
             // 親フォームを保存
-            ParentForm = Parent;
-            Interlocked.Increment(ref InstanceCount); // インスタンス数をインクリメント
+            this.parentForm = parent;
+
+            Interlocked.Increment(ref instanceCount); // インスタンス数をインクリメント
         }
 
         /// <summary>
@@ -99,41 +72,46 @@ namespace StickyNoteApp
         {
             return new ReminderInfo
             {
-                IsActive = IsActiveValue,
-                ReminderTime = ReminderTimeValue
+                IsActive = isActive,
+                ReminderTime = reminderTime
             };
         }
 
         /// <summary>
         /// リマインダーを復元（データベースからの読み込み時用）
         /// </summary>
-        public void RestoreReminder(string NoteIdParam, string Content, DateTime ReminderTimeParam)
+        public void RestoreReminder(string noteId, string content, DateTime reminderTime)
         {
             try
             {
                 // 過去の時刻は無視
-                if (ReminderTimeParam <= DateTime.Now)
+                if (reminderTime <= DateTime.Now)
                 {
                     return;
                 }
 
-                NoteId = NoteIdParam;
-                NoteContent = Content ?? string.Empty;
-                ReminderTimeValue = ReminderTimeParam;
-                IsActiveValue = true;
+                this.noteId = noteId;
+                this.noteContent = content ?? string.Empty;
+                this.reminderTime = reminderTime;
+                this.isActive = true;
 
                 // 既存のタイマーがあれば停止
-                StopAndDisposeTimer();
+                if (reminderTimer != null)
+                {
+                    reminderTimer.Stop();
+                    reminderTimer.Tick -= ReminderTimer_Tick; // イベント解除
+                    reminderTimer.Dispose();
+                }
 
                 // タイマー作成
-                ReminderTimer = new System.Windows.Forms.Timer();
-                ReminderTimer.Interval = TIMER_INTERVAL_MS;
-                ReminderTimer.Tick += ReminderTimer_Tick;
-                ReminderTimer.Start();
+                reminderTimer = new System.Windows.Forms.Timer();
+                reminderTimer.Interval = TIMER_INTERVAL_MS;
+                reminderTimer.Tick += ReminderTimer_Tick;
+                reminderTimer.Start();
             }
             catch
             {
-                // リマインダー復元失敗時は無視（付箋自体は使用可能）
+                // リマインダー復失敗時は無視（付箋自体は使用可能）
             }
         }
 
@@ -142,18 +120,18 @@ namespace StickyNoteApp
         /// 有効かつ未来の時刻に設定されているリマインダーのみを復元する。
         /// リマインダーが復元された場合は true、復元されなかった場合は false を返す。
         /// </summary>
-        public bool RestoreReminderFromDatabase(string NoteIdParam, string Content, Microsoft.Data.Sqlite.SqliteDataReader Reader)
+        public bool RestoreReminderFromDatabase(string noteId, string content, Microsoft.Data.Sqlite.SqliteDataReader reader)
         {
             try
             {
                 // ReminderActiveカラムの存在確認と読み取り
-                int ReminderActiveOrdinal = COLUMN_NOT_FOUND;
-                int ReminderTimeOrdinal = COLUMN_NOT_FOUND;
+                int reminderActiveOrdinal = COLUMN_NOT_FOUND;
+                int reminderTimeOrdinal = COLUMN_NOT_FOUND;
 
                 try
                 {
-                    ReminderActiveOrdinal = Reader.GetOrdinal("ReminderActive");
-                    ReminderTimeOrdinal = Reader.GetOrdinal("ReminderTime");
+                    reminderActiveOrdinal = reader.GetOrdinal("ReminderActive");
+                    reminderTimeOrdinal = reader.GetOrdinal("ReminderTime");
                 }
                 catch
                 {
@@ -162,40 +140,40 @@ namespace StickyNoteApp
                 }
 
                 // リマインダーが有効かチェック
-                if (Reader.IsDBNull(ReminderActiveOrdinal))
+                if (reader.IsDBNull(reminderActiveOrdinal))
                 {
                     return false;
                 }
 
                 // リマインダーが「有効(1)」かどうかを数値でチェック
-                int ReminderActive = Convert.ToInt32(Reader.GetValue(ReminderActiveOrdinal));
-                if (ReminderActive != REMINDER_ENABLED) // 1 = 有効
+                int reminderActive = Convert.ToInt32(reader.GetValue(reminderActiveOrdinal));
+                if (reminderActive != REMINDER_ENABLED) // 1 = 有効
                 {
                     return false;
                 }
 
                 // リマインダー時刻を取得
-                if (Reader.IsDBNull(ReminderTimeOrdinal))
+                if (reader.IsDBNull(reminderTimeOrdinal))
                 {
                     return false;
                 }
 
-                string ReminderTimeStr = Reader.GetString(ReminderTimeOrdinal);
-                if (string.IsNullOrEmpty(ReminderTimeStr))
+                string reminderTimeStr = reader.GetString(reminderTimeOrdinal);
+                if (string.IsNullOrEmpty(reminderTimeStr))
                 {
                     return false;
                 }
 
-                DateTime ParsedReminderTime = DateTime.Parse(ReminderTimeStr);
+                DateTime reminderTime = DateTime.Parse(reminderTimeStr);
 
                 // 未来の時刻のみ復元
-                if (ParsedReminderTime <= DateTime.Now)
+                if (reminderTime <= DateTime.Now)
                 {
                     return false;
                 }
 
                 // リマインダーを復元
-                RestoreReminder(NoteIdParam, Content, ParsedReminderTime);
+                RestoreReminder(noteId, content, reminderTime);
 
                 return true;
             }
@@ -208,47 +186,52 @@ namespace StickyNoteApp
         /// <summary>
         /// リマインダーを設定
         /// </summary>
-        public void SetReminder(string NoteIdParam, string Content, int Minutes)
+        public void SetReminder(string noteId, string content, int minutes)
         {
             try
             {
                 // 入力値の検証
                 // 付箋IDが空の場合はエラー
-                if (string.IsNullOrEmpty(NoteIdParam))
+                if (string.IsNullOrEmpty(noteId))
                 {
-                    throw new ArgumentException(MSG_NO_NOTE_ID, nameof(NoteIdParam));
+                    throw new ArgumentException("付箋IDが指定されていません。", nameof(noteId));
                 }
 
-                if (Minutes < MIN_REMINDER_MINUTES) // 1分未満の場合はエラー
+                if (minutes < MIN_REMINDER_MINUTES) // 1分未満の場合はエラー
                 {
-                    throw new ArgumentException(string.Format(MSG_MIN_MINUTES, MIN_REMINDER_MINUTES), nameof(Minutes));
+                    throw new ArgumentException($"時間は{MIN_REMINDER_MINUTES}分以上を指定してください。", nameof(minutes));
                 }
 
-                if (Minutes > MAX_REMINDER_MINUTES) // 最大24時間（1440分）を超える場合はエラー
+                if (minutes > MAX_REMINDER_MINUTES) // 最大24時間（1440分）を超える場合はエラー
                 {
-                    throw new ArgumentException(string.Format(MSG_MAX_HOURS, MAX_REMINDER_HOURS, MAX_REMINDER_MINUTES), nameof(Minutes));
+                    throw new ArgumentException($"時間は{MAX_REMINDER_HOURS}時間({MAX_REMINDER_MINUTES}分)以内を指定してください。", nameof(minutes));
                 }
 
-                NoteId = NoteIdParam;
-                NoteContent = Content ?? string.Empty;
-                ReminderTimeValue = DateTime.Now.AddMinutes(Minutes);
-                IsActiveValue = true;
+                this.noteId = noteId;
+                this.noteContent = content ?? string.Empty;
+                this.reminderTime = DateTime.Now.AddMinutes(minutes);
+                this.isActive = true;
 
                 // 既存のタイマーがあれば停止
-                StopAndDisposeTimer();
+                if (reminderTimer != null)
+                {
+                    reminderTimer.Stop();
+                    reminderTimer.Tick -= ReminderTimer_Tick; // イベント解除
+                    reminderTimer.Dispose();
+                }
 
                 // 新しいタイマーを作成(1秒ごとにチェック)
-                ReminderTimer = new System.Windows.Forms.Timer();
-                ReminderTimer.Interval = TIMER_INTERVAL_MS;
-                ReminderTimer.Tick += ReminderTimer_Tick;
-                ReminderTimer.Start();
+                reminderTimer = new System.Windows.Forms.Timer();
+                reminderTimer.Interval = TIMER_INTERVAL_MS;
+                reminderTimer.Tick += ReminderTimer_Tick;
+                reminderTimer.Start();
 
                 // 状態変更完了時に保存処理を呼ぶ
                 SaveReminderState();
             }
-            catch (Exception Ex)
+            catch (Exception ex)
             {
-                MessageBox.Show(string.Format(MSG_SET_FAILED, Ex.Message), TITLE_ERROR,
+                MessageBox.Show($"リマインダーの設定に失敗しました。\n\n{ex.Message}", "エラー",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
                 throw;
             }
@@ -261,9 +244,15 @@ namespace StickyNoteApp
         {
             try
             {
-                StopAndDisposeTimer();
-                ReminderTimer = null;
-                IsActiveValue = false;
+                if (reminderTimer != null)
+                {
+                    reminderTimer.Stop();
+                    reminderTimer.Tick -= ReminderTimer_Tick; // イベント解除
+                    reminderTimer.Dispose();
+                    reminderTimer = null;
+                }
+
+                isActive = false;
 
                 // 状態変更完了時に保存処理を呼ぶ
                 SaveReminderState();
@@ -275,31 +264,18 @@ namespace StickyNoteApp
         }
 
         /// <summary>
-        /// タイマーを停止・解除する共通処理
-        /// </summary>
-        private void StopAndDisposeTimer()
-        {
-            if (ReminderTimer != null)
-            {
-                ReminderTimer.Stop();
-                ReminderTimer.Tick -= ReminderTimer_Tick; // イベント解除
-                ReminderTimer.Dispose();
-            }
-        }
-
-        /// <summary>
         /// タイマーのティック処理
         /// </summary>
-        private void ReminderTimer_Tick(object Sender, EventArgs E)
+        private void ReminderTimer_Tick(object sender, EventArgs e)
         {
             try
             {
-                if (DateTime.Now >= ReminderTimeValue)
+                if (DateTime.Now >= reminderTime)
                 {
                     // タイマー停止
-                    ReminderTimer.Stop();
-                    ReminderTimer.Tick -= ReminderTimer_Tick; // イベント解除
-                    IsActiveValue = false;
+                    reminderTimer.Stop();
+                    reminderTimer.Tick -= ReminderTimer_Tick; // イベント解除
+                    isActive = false;
 
                     // 状態変更完了時に保存処理を呼ぶ（リマインダー解除状態を保存）
                     SaveReminderState();
@@ -317,11 +293,11 @@ namespace StickyNoteApp
                 // タイマーエラーが発生した場合は停止
                 try
                 {
-                    if (ReminderTimer != null)
+                    if (reminderTimer != null)
                     {
-                        ReminderTimer.Stop();
-                        ReminderTimer.Tick -= ReminderTimer_Tick; // イベント解除
-                        IsActiveValue = false;
+                        reminderTimer.Stop();
+                        reminderTimer.Tick -= ReminderTimer_Tick; // イベント解除
+                        isActive = false;
                     }
                 }
                 catch
@@ -339,10 +315,14 @@ namespace StickyNoteApp
         {
             try
             {
-                if (ParentForm == null) return;
+                if (parentForm == null)
+                {
+                    return;
+                }
 
                 // 親フォームに付箋の保存を依頼
-                ParentForm.SaveCurrentNoteState();
+                // 親フォーム側で現在の付箋の全情報をDatabase.SaveOrUpdate()に渡す
+                parentForm.SaveCurrentNoteState();
             }
             catch
             {
@@ -358,8 +338,8 @@ namespace StickyNoteApp
             try
             {
                 MessageBox.Show(
-                    string.Format(MSG_NOTIFICATION, NoteContent),
-                    TITLE_NOTIFICATION,
+                    $"リマインダー通知\n\n{noteContent}",
+                    "付箋リマインダー",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information
                 );
@@ -377,11 +357,16 @@ namespace StickyNoteApp
         {
             try
             {
-                StopAndDisposeTimer();
-                ReminderTimer = null;
-                IsActiveValue = false;
+                if (reminderTimer != null)
+                {
+                    reminderTimer.Stop();
+                    reminderTimer.Tick -= ReminderTimer_Tick; // イベント解除
+                    reminderTimer.Dispose();
+                    reminderTimer = null;
+                }
+                isActive = false;
 
-                try { Interlocked.Decrement(ref InstanceCount); } catch { }
+                try { Interlocked.Decrement(ref instanceCount); } catch { }
             }
             catch
             {
@@ -392,33 +377,33 @@ namespace StickyNoteApp
         /// <summary>
         /// カスタム時間設定ダイアログを表示してリマインダーを設定
         /// </summary>
-        public void ShowCustomReminderDialog(string NoteIdParam, string Content)
+        public void ShowCustomReminderDialog(string noteId, string noteContent)
         {
             try
             {
-                using (var InputForm = CreateCustomReminderForm())
+                using (var inputForm = CreateCustomReminderForm())
                 {
-                    if (InputForm.ShowDialog() == DialogResult.OK)
+                    if (inputForm.ShowDialog() == DialogResult.OK)
                     {
-                        var Hours = (int)InputForm.Controls[CONTROL_NUMERIC_HOURS].Tag;
-                        var Minutes = (int)InputForm.Controls[CONTROL_NUMERIC_MINUTES].Tag;
-                        int TotalMinutes = (Hours * MINUTES_PER_HOUR) + Minutes;
+                        var hours = (int)inputForm.Controls["NumericUpDownHours"].Tag;
+                        var minutes = (int)inputForm.Controls["NumericUpDownMinutes"].Tag;
+                        int totalMinutes = (hours * MINUTES_PER_HOUR) + minutes;
 
                         // 0時間0分のチェック
-                        if (TotalMinutes < MIN_REMINDER_MINUTES)
+                        if (totalMinutes < MIN_REMINDER_MINUTES)
                         {
-                            MessageBox.Show(string.Format(MSG_MIN_MINUTES, MIN_REMINDER_MINUTES), TITLE_INPUT_ERROR,
+                            MessageBox.Show($"時間は{MIN_REMINDER_MINUTES}分以上を指定してください。", "入力エラー",
                                 MessageBoxButtons.OK, MessageBoxIcon.Warning);
                             return;
                         }
 
-                        SetReminderWithConfirmation(NoteIdParam, Content, TotalMinutes);
+                        SetReminderWithConfirmation(noteId, noteContent, totalMinutes);
                     }
                 }
             }
-            catch (Exception Ex)
+            catch (Exception ex)
             {
-                MessageBox.Show(string.Format(MSG_DIALOG_FAILED, Ex.Message), TITLE_ERROR,
+                MessageBox.Show($"ダイアログの表示に失敗しました。\n\n{ex.Message}", "エラー",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -426,53 +411,53 @@ namespace StickyNoteApp
         /// <summary>
         /// OKボタンクリック時の処理
         /// </summary>
-        private void OkButton_Click(object Sender, EventArgs E,
-            System.Windows.Forms.NumericUpDown NumericUpDownHours,
-            System.Windows.Forms.NumericUpDown NumericUpDownMinutes)
+        private void OkButton_Click(object sender, EventArgs e,
+            System.Windows.Forms.NumericUpDown numericUpDownHours,
+            System.Windows.Forms.NumericUpDown numericUpDownMinutes)
         {
-            NumericUpDownHours.Tag = (int)NumericUpDownHours.Value;
-            NumericUpDownMinutes.Tag = (int)NumericUpDownMinutes.Value;
+            numericUpDownHours.Tag = (int)numericUpDownHours.Value;
+            numericUpDownMinutes.Tag = (int)numericUpDownMinutes.Value;
         }
 
         /// <summary>
         /// リマインダーを設定し、確認メッセージを表示
         /// </summary>
-        public void SetReminderWithConfirmation(string NoteIdParam, string Content, int Minutes)
+        public void SetReminderWithConfirmation(string noteId, string noteContent, int minutes)
         {
             try
             {
-                SetReminder(NoteIdParam, Content, Minutes);
+                SetReminder(noteId, noteContent, minutes);
 
-                DateTime ConfirmTime = DateTime.Now.AddMinutes(Minutes);
+                DateTime reminderTime = DateTime.Now.AddMinutes(minutes);
 
                 // 時間と分を計算して表示
-                int Hours = Minutes / MINUTES_PER_HOUR;
-                int Mins = Minutes % MINUTES_PER_HOUR;
+                int hours = minutes / MINUTES_PER_HOUR;
+                int mins = minutes % MINUTES_PER_HOUR;
 
-                string TimeText;
-                if (Hours > 0 && Mins > 0)
+                string timeText;
+                if (hours > 0 && mins > 0)
                 {
-                    TimeText = string.Format(TIME_TEXT_HOURS_MINS, Hours, Mins);
+                    timeText = $"{hours}時間{mins}分後";
                 }
-                else if (Hours > 0)
+                else if (hours > 0)
                 {
-                    TimeText = string.Format(TIME_TEXT_HOURS_ONLY, Hours);
+                    timeText = $"{hours}時間後";
                 }
                 else
                 {
-                    TimeText = string.Format(TIME_TEXT_MINS_ONLY, Mins);
+                    timeText = $"{mins}分後";
                 }
 
                 MessageBox.Show(
-                    string.Format(MSG_CONFIRM_SET, TimeText, ConfirmTime),
-                    TITLE_REMINDER_SET,
+                    $"{timeText}にリマインダーを通知します。\n\n通知時刻: {reminderTime:HH:mm:ss}",
+                    "リマインダー設定",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information
                 );
             }
-            catch (Exception Ex)
+            catch (Exception ex)
             {
-                MessageBox.Show(string.Format(MSG_SET_FAILED, Ex.Message), TITLE_ERROR,
+                MessageBox.Show($"リマインダーの設定に失敗しました。\n\n{ex.Message}", "エラー",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -487,18 +472,17 @@ namespace StickyNoteApp
                 if (IsActive)
                 {
                     CancelReminder();
-                    MessageBox.Show(MSG_CANCEL_SUCCESS, TITLE_REMINDER,
+                    MessageBox.Show("リマインダーをキャンセルしました。", "リマインダー",
                         MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
                 else
                 {
-                    MessageBox.Show(MSG_NO_REMINDER, TITLE_REMINDER,
+                    MessageBox.Show("設定されているリマインダーはありません。", "リマインダー",
                         MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
             }
-            catch (Exception Ex)
-            {
-                MessageBox.Show(string.Format(MSG_CANCEL_FAILED, Ex.Message), TITLE_ERROR,
+            catch (Exception ex)           {
+                MessageBox.Show($"リマインダーのキャンセルに失敗しました。\n\n{ex.Message}", "エラー",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }

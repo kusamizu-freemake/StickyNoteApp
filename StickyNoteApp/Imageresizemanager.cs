@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics;
 using System.Drawing;
 using System.Windows.Forms;
 
@@ -17,48 +16,28 @@ namespace StickyNoteApp
         public const int SIZE_LARGE = 200; // 大
         public const int SIZE_EXTRA_LARGE = 250; // 特大
 
-        // 数値定数
-        private const int MIN_TEXT_AREA_HEIGHT = 80; // テキスト領域の最小高さ
-        private const int DEFAULT_TITLE_BAR_HEIGHT = 40;
-
-        // ログメッセージ定数
-        private const string MSG_NO_ORIGINAL_PATH = "元画像パスが設定されていません";
-        private const string MSG_RESIZE_SUCCESS = "リサイズ成功: {0}";
-        private const string MSG_RESIZE_SKIPPED = "リサイズをスキップしました（アニメーションGIFまたはエラー）";
-        private const string MSG_AUTO_ADJUST = "付箋サイズを自動調整: {0}px (画像: {1}px, テキスト領域: {2}px確保)";
-
-        // ダイアログ・メッセージ定数
-        private const string MSG_NO_IMAGE_TO_SAVE = "保存する画像がありません。";
-        private const string TITLE_INFO = "情報";
-
-        // メニューラベル定数
-        private const string MENU_LABEL_SMALL = "小 (100px)";
-        private const string MENU_LABEL_MEDIUM = "中 (150px)";
-        private const string MENU_LABEL_LARGE = "大 (200px)";
-        private const string MENU_LABEL_EXTRA_LARGE = "特大 (250px)";
-
-        // コントロール名定数
-        private const string CONTROL_TITLE_BAR = "titleBar";
+        // テキスト領域の最小高さ
+        private const int MIN_TEXT_AREA_HEIGHT = 80;
 
         // 依存オブジェクト
-        private readonly StickyNoteForm ParentForm;
-        private readonly PictureBox PictureBox;
-        private readonly ImageManager ImageManager;
-        private readonly ImageResizer ImageResizer;
+        private readonly StickyNoteForm parentForm;
+        private readonly PictureBox pictureBox;
+        private readonly ImageManager imageManager;
+        private readonly ImageResizer imageResizer;
 
         /// <summary>
         /// コンストラクタ
         /// </summary>
-        /// <param name="Form">親付箋フォーム（保存メソッドの呼び出し元）</param>
-        /// <param name="PicBox">画像を表示しているPictureBox</param>
-        /// <param name="ImgManager">画像マネージャー（状態更新・レイアウト調整の委譲先）</param>
-        /// <param name="ImgResizer">画像リサイザー（リサイズ処理の委譲先）</param>
-        public ImageResizeManager(StickyNoteForm Form, PictureBox PicBox, ImageManager ImgManager, ImageResizer ImgResizer)
+        /// <param name="form">親付箋フォーム（保存メソッドの呼び出し元）</param>
+        /// <param name="picBox">画像を表示しているPictureBox</param>
+        /// <param name="imgManager">画像マネージャー（状態更新・レイアウト調整の委譲先）</param>
+        /// <param name="imgResizer">画像リサイザー（リサイズ処理の委譲先）</param>
+        public ImageResizeManager(StickyNoteForm form, PictureBox picBox, ImageManager imgManager, ImageResizer imgResizer)
         {
-            ParentForm = Form;
-            PictureBox = PicBox;
-            ImageManager = ImgManager;
-            ImageResizer = ImgResizer;
+            parentForm = form;
+            pictureBox = picBox;
+            imageManager = imgManager;
+            imageResizer = imgResizer;
         }
 
         /// <summary>
@@ -67,111 +46,117 @@ namespace StickyNoteApp
         /// PictureBoxの高さを更新し、ImageManagerの表示高さと
         /// テキストボックスの位置も連動して調整する。
         /// </summary>
-        /// <param name="Height">設定する高さ（px）</param>
-        public void ResizeImage(int Height)
+        /// <param name="height">設定する高さ（px）</param>
+        public void ResizeImage(int height)
         {
-            if (!PictureBox.Visible) return;
+            if (!pictureBox.Visible) return;
 
             // 1. 元画像パスと古いリサイズ済みパスを取得
-            string OriginalPath = ImageManager.GetOriginalImagePath();
-            string OldResizedPath = ImageManager.GetResizedImagePath();
+            string originalPath = imageManager.GetOriginalImagePath();
+            string oldResizedPath = imageManager.GetResizedImagePath();
 
-            if (string.IsNullOrEmpty(OriginalPath))
+            if (string.IsNullOrEmpty(originalPath))
             {
-                Debug.WriteLine(MSG_NO_ORIGINAL_PATH);
+                System.Diagnostics.Debug.WriteLine("元画像パスが設定されていません");
                 return;
             }
 
             // 2. 古いリサイズ済み画像を削除
-            if (!string.IsNullOrEmpty(OldResizedPath))
+            if (!string.IsNullOrEmpty(oldResizedPath))
             {
-                ImageResizer.DeleteResizedImage(OldResizedPath);
+                imageResizer.DeleteResizedImage(oldResizedPath);
             }
 
             // 3. 新しいサイズでリサイズ実行（ImageResizerに委譲）
-            string NewResizedPath = ImageResizer.ResizeAndSaveImage(
-                OriginalPath,
-                Height,
-                ParentForm.NoteId
+            string newResizedPath = imageResizer.ResizeAndSaveImage(
+                originalPath,
+                height,
+                parentForm.NoteId
             );
 
-            if (NewResizedPath != null)
+            if (newResizedPath != null)
             {
-                Debug.WriteLine(string.Format(MSG_RESIZE_SUCCESS, NewResizedPath));
+                System.Diagnostics.Debug.WriteLine($"リサイズ成功: {newResizedPath}");
 
                 // 4. ImageManagerに新しいパスを設定
-                ImageManager.SetResizedImagePath(NewResizedPath);
+                imageManager.SetResizedImagePath(newResizedPath);
             }
             else
             {
-                Debug.WriteLine(MSG_RESIZE_SKIPPED);
+                System.Diagnostics.Debug.WriteLine("リサイズをスキップしました（アニメーションGIFまたはエラー）");
             }
 
             // 5. 表示サイズを変更
-            PictureBox.Height = Height;
-            ImageManager.SetImageDisplayHeight(Height);
-            ImageManager.AdjustTextBoxPosition();
+            pictureBox.Height = height;
+            imageManager.SetImageDisplayHeight(height);
+            imageManager.AdjustTextBoxPosition();
 
             // テキスト領域が十分に見えるように付箋サイズを調整
-            EnsureTextAreaVisible(Height);
+            EnsureTextAreaVisible(height);
 
             // 6. 保存
-            ParentForm.SaveCurrentNoteState();
+            parentForm.SaveCurrentNoteState();
         }
 
         /// <summary>
         /// テキスト領域が十分に表示されるように付箋サイズを調整
         /// 画像サイズ変更時にテキストが見えなくならないようにする
         /// </summary>
-        /// <param name="ImageHeight">画像の高さ</param>
-        private void EnsureTextAreaVisible(int ImageHeight)
+        /// <param name="imageHeight">画像の高さ</param>
+        private void EnsureTextAreaVisible(int imageHeight)
         {
             // タイトルバーの高さを取得
-            int TitleBarHeight = ParentForm.Controls[CONTROL_TITLE_BAR]?.Height ?? DEFAULT_TITLE_BAR_HEIGHT;
+            int TitleBarHeight = parentForm.Controls["titleBar"]?.Height ?? 40;
 
             // 現在のテキスト領域の高さを計算
-            int CurrentTextHeight = ParentForm.ClientSize.Height - TitleBarHeight - ImageHeight;
+            int CurrentTextHeight = parentForm.ClientSize.Height - TitleBarHeight - imageHeight;
 
             // テキスト領域が最小高さより小さい場合、付箋を拡大
             if (CurrentTextHeight < MIN_TEXT_AREA_HEIGHT)
             {
-                int RequiredHeight = TitleBarHeight + ImageHeight + MIN_TEXT_AREA_HEIGHT;
-                ParentForm.ClientSize = new Size(ParentForm.ClientSize.Width, RequiredHeight);
+                int RequiredHeight = TitleBarHeight + imageHeight + MIN_TEXT_AREA_HEIGHT;
+                parentForm.ClientSize = new Size(parentForm.ClientSize.Width, RequiredHeight);
 
                 // サイズ変更後、再度テキストボックスの位置を調整
-                ImageManager.AdjustTextBoxPosition();
+                imageManager.AdjustTextBoxPosition();
 
-                Debug.WriteLine(string.Format(MSG_AUTO_ADJUST,
-                    ParentForm.ClientSize.Height, ImageHeight, MIN_TEXT_AREA_HEIGHT));
+                System.Diagnostics.Debug.WriteLine(
+                    $"付箋サイズを自動調整: {parentForm.ClientSize.Height}px " +
+                    $"(画像: {imageHeight}px, テキスト領域: {MIN_TEXT_AREA_HEIGHT}px確保)"
+                );
             }
         }
 
         /// <summary>
         /// ユーザー指定場所に画像を保存する（表示サイズは変更しない）
         /// </summary>
-        /// <param name="Height">リサイズ後の高さ（px）、0の場合は元のサイズで保存</param>
-        public void SaveResizedImageToUserLocation(int Height)
+        /// <param name="height">リサイズ後の高さ（px）、0の場合は元のサイズで保存</param>
+        public void SaveResizedImageToUserLocation(int height)
         {
-            string OriginalPath = ImageManager.GetOriginalImagePath();
+            string originalPath = imageManager.GetOriginalImagePath();
 
-            if (string.IsNullOrEmpty(OriginalPath))
+            if (string.IsNullOrEmpty(originalPath))
             {
-                MessageBox.Show(MSG_NO_IMAGE_TO_SAVE, TITLE_INFO, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show(
+                    "保存する画像がありません。",
+                    "情報",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
                 return;
             }
 
             // 推奨ファイル名
-            string SuggestedFileName = "image";
+            string suggestedFileName = "image";
 
-            if (Height == 0)
+            if (height == 0)
             {
                 // 元のサイズで保存（ImageResizerに委譲）
-                ImageResizer.SaveOriginalImageToUserLocation(OriginalPath, SuggestedFileName);
+                imageResizer.SaveOriginalImageToUserLocation(originalPath, suggestedFileName);
             }
             else
             {
                 // リサイズして保存（ImageResizerに委譲）
-                ImageResizer.ResizeAndSaveToUserLocation(OriginalPath, Height, SuggestedFileName);
+                imageResizer.ResizeAndSaveToUserLocation(originalPath, height, suggestedFileName);
             }
         }
 
@@ -179,23 +164,23 @@ namespace StickyNoteApp
         /// サイズ選択メニューの DropDownItems に項目を追加する。
         /// 呼び出し側で用意した ToolStripMenuItem（親メニュー）を渡す。
         /// </summary>
-        /// <param name="ParentMenuItem">「画像サイズ」サブメニューの親項目</param>
-        public void CreateSizeMenuItems(ToolStripMenuItem ParentMenuItem)
+        /// <param name="parentMenuItem">「画像サイズ」サブメニューの親項目</param>
+        public void CreateSizeMenuItems(ToolStripMenuItem parentMenuItem)
         {
-            var Items = new (string Label, int Size)[]
+            var items = new (string label, int size)[]
             {
-                (MENU_LABEL_SMALL,       SIZE_SMALL),
-                (MENU_LABEL_MEDIUM,      SIZE_MEDIUM),
-                (MENU_LABEL_LARGE,       SIZE_LARGE),
-                (MENU_LABEL_EXTRA_LARGE, SIZE_EXTRA_LARGE),
+                ("小 (100px)",   SIZE_SMALL),
+                ("中 (150px)",   SIZE_MEDIUM),
+                ("大 (200px)",   SIZE_LARGE),
+                ("特大 (250px)", SIZE_EXTRA_LARGE),
             };
 
-            foreach (var (Label, Size) in Items)
+            foreach (var (label, size) in items)
             {
-                var MenuItem = new ToolStripMenuItem(Label);
-                int CapturedSize = Size; // クロージャキャプチャ用
-                MenuItem.Click += (S, E) => ResizeImage(CapturedSize);
-                ParentMenuItem.DropDownItems.Add(MenuItem);
+                var item = new ToolStripMenuItem(label);
+                int capturedSize = size; // クロージャキャプチャ用
+                item.Click += (s, e) => ResizeImage(capturedSize);
+                parentMenuItem.DropDownItems.Add(item);
             }
         }
     }
