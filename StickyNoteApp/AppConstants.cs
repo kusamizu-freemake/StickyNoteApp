@@ -4,11 +4,6 @@ namespace StickyNoteApp
 {
     /// <summary>
     /// アプリケーション全体で使用する定数を管理するクラス
-    /// ※ 各クラスの private const を本ファイルに集約し、追記運用を想定
-    /// 確認後、削除予定
-    /// ①各 .cs から private const 宣言を削除
-    /// ②AppConstants.Xxx.Yyy への参照に書き換え
-    /// ③残りファイルの定数を末尾の追記エリアに足していく
     /// </summary>
     public static class AppConstants
     {
