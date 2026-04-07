@@ -12,34 +12,6 @@ namespace StickyNoteApp
     /// </summary>
     public static class Database
     {
-        // ログメッセージ定数
-        private const string MSG_TABLE_NOT_FOUND = "StickyNotesテーブルが存在しません。作成します。";
-        private const string MSG_ADD_COLUMN_IMAGE_PATH = "ImagePathカラムを追加します。";
-        private const string MSG_ADD_COLUMN_ORIGINAL = "OriginalImagePathカラムを追加します。";
-        private const string MSG_ADD_COLUMN_RESIZED = "ResizedImagePathカラムを追加します。";
-        private const string MSG_ADD_COLUMN_DISP_HEIGHT = "ImageDisplayHeightカラムを追加します。";
-        private const string MSG_ADD_COLUMN_REMINDER_ACTIVE = "ReminderActiveカラムを追加します。";
-        private const string MSG_ADD_COLUMN_REMINDER_TIME = "ReminderTimeカラムを追加します。";
-        private const string MSG_DBINIT_COMPLETE = "データベース初期化完了";
-        private const string MSG_DBINIT_ERROR = "データベース初期化エラー: {0}";
-        private const string MSG_IMAGE_MIGRATE_COUNT = "画像データを移行しました: {0}件";
-        private const string MSG_IMAGE_MIGRATE_ERROR = "画像データ移行エラー: {0}";
-        private const string MSG_COLUMN_ADDED = "{0}カラム追加完了";
-        private const string MSG_TABLE_CREATED = "StickyNotesテーブル作成完了";
-        private const string MSG_SKIP_SAVE_RESTORING = "[SaveOrUpdate] 復元中のため保存をスキップ";
-        private const string MSG_SAVE_ERROR = "データ保存エラー: {0}";
-        private const string MSG_SKIP_DELETE_RESTORING = "[SoftDelete] 復元中のため削除をスキップ";
-        private const string MSG_DELETE_ERROR = "データ削除エラー: {0}";
-        private const string MSG_LOAD_COUNT = "データベースから{0}件の付箋を読み込みました";
-        private const string MSG_LOAD_ERROR = "データ読み込みエラー: {0}";
-
-        // DB フォルダ・ファイル名定数
-        private const string DB_FOLDER_NAME = "StickyNoteApp";
-        private const string DD_FILE_NAME = "stickynotes.db";
-
-        // 日時フォーマット
-        private const string DATE_TIME_FORMAT = "yyyy-MM-dd HH:mm:ss";
-
         // 「SQLite Error 5: 'database is locked'.」防止
         // DB保存処理の排他制御用ロックオブジェクト
         private static readonly object SaveLock = new object();
@@ -47,8 +19,8 @@ namespace StickyNoteApp
         // データベースファイルのパス
         private static readonly string DbPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            DB_FOLDER_NAME,
-            DD_FILE_NAME
+            AppConstants.SharedConfig.APP_FOLDER_NAME,
+            AppConstants.DatabaseConfig.DD_FILE_NAME
         );
 
         // 接続文字列
@@ -110,7 +82,7 @@ namespace StickyNoteApp
                     // StickyNotesテーブル存在確認
                     if (!TableExists(Con, "StickyNotes"))
                     {
-                        Debug.WriteLine(MSG_TABLE_NOT_FOUND);
+                        Debug.WriteLine(AppConstants.DatabaseMsg.MSG_TABLE_NOT_FOUND);
                         CreateStickyNotesTable(Con);
                     }
                     else
@@ -118,41 +90,41 @@ namespace StickyNoteApp
                         // 既存のテーブルにカラムを追加
                         if (!ColumnExists(Con, "StickyNotes", "ImagePath"))
                         {
-                            Debug.WriteLine(MSG_ADD_COLUMN_IMAGE_PATH);
+                            Debug.WriteLine(AppConstants.DatabaseMsg.MSG_ADD_COLUMN_IMAGE_PATH);
                             AddColumn(Con, "StickyNotes", "ImagePath", "TEXT");
                         }
 
                         // 元画像パスのカラム
                         if (!ColumnExists(Con, "StickyNotes", "OriginalImagePath"))
                         {
-                            Debug.WriteLine(MSG_ADD_COLUMN_ORIGINAL);
+                            Debug.WriteLine(AppConstants.DatabaseMsg.MSG_ADD_COLUMN_ORIGINAL);
                             AddColumn(Con, "StickyNotes", "OriginalImagePath", "TEXT");
                         }
 
                         // リサイズ済み画像パスのカラム
                         if (!ColumnExists(Con, "StickyNotes", "ResizedImagePath"))
                         {
-                            Debug.WriteLine(MSG_ADD_COLUMN_RESIZED);
+                            Debug.WriteLine(AppConstants.DatabaseMsg.MSG_ADD_COLUMN_RESIZED);
                             AddColumn(Con, "StickyNotes", "ResizedImagePath", "TEXT");
                         }
 
                         // 画像表示高さのカラム
                         if (!ColumnExists(Con, "StickyNotes", "ImageDisplayHeight"))
                         {
-                            Debug.WriteLine(MSG_ADD_COLUMN_DISP_HEIGHT);
+                            Debug.WriteLine(AppConstants.DatabaseMsg.MSG_ADD_COLUMN_DISP_HEIGHT);
                             AddColumn(Con, "StickyNotes", "ImageDisplayHeight", "INTEGER DEFAULT 150");
                         }
 
                         // リマインダー関連カラムを追加
                         if (!ColumnExists(Con, "StickyNotes", "ReminderActive"))
                         {
-                            Debug.WriteLine(MSG_ADD_COLUMN_REMINDER_ACTIVE);
+                            Debug.WriteLine(AppConstants.DatabaseMsg.MSG_ADD_COLUMN_REMINDER_ACTIVE);
                             AddColumn(Con, "StickyNotes", "ReminderActive", "INTEGER DEFAULT 0");
                         }
 
                         if (!ColumnExists(Con, "StickyNotes", "ReminderTime"))
                         {
-                            Debug.WriteLine(MSG_ADD_COLUMN_REMINDER_TIME);
+                            Debug.WriteLine(AppConstants.DatabaseMsg.MSG_ADD_COLUMN_REMINDER_TIME);
                             AddColumn(Con, "StickyNotes", "ReminderTime", "TEXT");
                         }
 
@@ -161,12 +133,12 @@ namespace StickyNoteApp
                     }
                 } //← usingを抜けると自動的にclose
 
-                Debug.WriteLine(MSG_DBINIT_COMPLETE);
+                Debug.WriteLine(AppConstants.DatabaseMsg.MSG_DBINIT_COMPLETE);
             }
             catch (Exception Ex)
             {
-                Debug.WriteLine(string.Format(MSG_DBINIT_ERROR, Ex.Message));
-                throw new Exception(string.Format(MSG_DBINIT_ERROR, Ex.Message), Ex);
+                Debug.WriteLine(string.Format(AppConstants.DatabaseMsg.MSG_DBINIT_ERROR, Ex.Message));
+                throw new Exception(string.Format(AppConstants.DatabaseMsg.MSG_DBINIT_ERROR, Ex.Message), Ex);
             }
         }
 
@@ -190,13 +162,13 @@ namespace StickyNoteApp
                     int Count = Cmd.ExecuteNonQuery();
                     if (Count > 0)
                     {
-                        Debug.WriteLine(string.Format(MSG_IMAGE_MIGRATE_COUNT, Count));
+                        Debug.WriteLine(string.Format(AppConstants.DatabaseMsg.MSG_IMAGE_MIGRATE_COUNT, Count));
                     }
                 }
             }
             catch (Exception Ex)
             {
-                Debug.WriteLine(string.Format(MSG_IMAGE_MIGRATE_ERROR, Ex.Message));
+                Debug.WriteLine(string.Format(AppConstants.DatabaseMsg.MSG_IMAGE_MIGRATE_ERROR, Ex.Message));
                 // エラーが発生してもアプリは続行
             }
         }
@@ -249,7 +221,7 @@ namespace StickyNoteApp
             using (var Cmd = new SqliteCommand(Sql, Con))
             {
                 Cmd.ExecuteNonQuery();
-                Debug.WriteLine(string.Format(MSG_COLUMN_ADDED, ColumnName));
+                Debug.WriteLine(string.Format(AppConstants.DatabaseMsg.MSG_COLUMN_ADDED, ColumnName));
             }
         }
 
@@ -284,7 +256,7 @@ namespace StickyNoteApp
             using (var Cmd = new SqliteCommand(Sql, Con))
             {
                 Cmd.ExecuteNonQuery();
-                Debug.WriteLine(MSG_TABLE_CREATED);
+                Debug.WriteLine(AppConstants.DatabaseMsg.MSG_TABLE_CREATED);
             }
         }
 
@@ -296,7 +268,7 @@ namespace StickyNoteApp
             // 復元中は保存しない
             if (Common.IsRestoring)
             {
-                Debug.WriteLine(MSG_SKIP_SAVE_RESTORING);
+                Debug.WriteLine(AppConstants.DatabaseMsg.MSG_SKIP_SAVE_RESTORING);
                 return;
             }
 
@@ -359,10 +331,10 @@ namespace StickyNoteApp
                             // リマインダー情報を保存
                             var ReminderInfo = Note.GetReminderInfo();
                             Cmd.Parameters.AddWithValue("$ReminderActive", ReminderInfo.IsActive ? 1 : 0);
-                            Cmd.Parameters.AddWithValue("$ReminderTime", ReminderInfo.IsActive ? ReminderInfo.ReminderTime.ToString(DATE_TIME_FORMAT) : "");
+                            Cmd.Parameters.AddWithValue("$ReminderTime", ReminderInfo.IsActive ? ReminderInfo.ReminderTime.ToString(AppConstants.SharedConfig.DATE_TIME_FORMAT) : "");
 
                             Cmd.Parameters.AddWithValue("$CreatedAt", Note.CreatedAt);
-                            Cmd.Parameters.AddWithValue("$UpdatedAt", DateTime.Now.ToString(DATE_TIME_FORMAT));
+                            Cmd.Parameters.AddWithValue("$UpdatedAt", DateTime.Now.ToString(AppConstants.SharedConfig.DATE_TIME_FORMAT));
 
                             // INSERTまたはUPDATE を実行
                             Cmd.ExecuteNonQuery();
@@ -371,7 +343,7 @@ namespace StickyNoteApp
                 }
                 catch (Exception Ex)
                 {
-                    Debug.WriteLine(string.Format(MSG_SAVE_ERROR, Ex.Message));
+                    Debug.WriteLine(string.Format(AppConstants.DatabaseMsg.MSG_SAVE_ERROR, Ex.Message));
                 }
             }
         }
@@ -384,7 +356,7 @@ namespace StickyNoteApp
             // 復元中は削除しない
             if (Common.IsRestoring)
             {
-                Debug.WriteLine(MSG_SKIP_DELETE_RESTORING);
+                Debug.WriteLine(AppConstants.DatabaseMsg.MSG_SKIP_DELETE_RESTORING);
                 return;
             }
 
@@ -400,14 +372,14 @@ namespace StickyNoteApp
                         using (var Cmd = new SqliteCommand(Sql, Con))
                         {
                             Cmd.Parameters.AddWithValue("$Id", Id);
-                            Cmd.Parameters.AddWithValue("$UpdatedAt", DateTime.Now.ToString(DATE_TIME_FORMAT));
+                            Cmd.Parameters.AddWithValue("$UpdatedAt", DateTime.Now.ToString(AppConstants.SharedConfig.DATE_TIME_FORMAT));
                             Cmd.ExecuteNonQuery();
                         }
                     } //← using を抜けると close
                 }
                 catch (Exception Ex)
                 {
-                    Debug.WriteLine(string.Format(MSG_DELETE_ERROR, Ex.Message));
+                    Debug.WriteLine(string.Format(AppConstants.DatabaseMsg.MSG_DELETE_ERROR, Ex.Message));
                 }
             }
         }
@@ -463,12 +435,12 @@ namespace StickyNoteApp
                     }
                 } // ← usingを抜けると確実にcloseされる
 
-                Debug.WriteLine(string.Format(MSG_LOAD_COUNT, Notes.Count));
+                Debug.WriteLine(string.Format(AppConstants.DatabaseMsg.MSG_LOAD_COUNT, Notes.Count));
                 return Notes;
             }
             catch (Exception Ex)
             {
-                throw new Exception(string.Format(MSG_LOAD_ERROR, Ex.Message), Ex);
+                throw new Exception(string.Format(AppConstants.DatabaseMsg.MSG_LOAD_ERROR, Ex.Message), Ex);
             }
         }
     } // ← Databaseクラスの終わり
