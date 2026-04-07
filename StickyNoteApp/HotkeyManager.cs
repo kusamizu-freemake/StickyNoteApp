@@ -69,9 +69,9 @@ namespace StickyNoteApp
                     return false;
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine(AppConstants.HotkeyMsg.MSG_REGISTER_ERROR);
+                System.Diagnostics.Debug.WriteLine(string.Format(AppConstants.HotkeyMsg.MSG_REGISTER_ERROR, ex.Message));
                 return false;
             }
         }
@@ -87,9 +87,9 @@ namespace StickyNoteApp
                 UnregisterHotKey(windowHandle, AppConstants.HotkeyConfig.HOTKEY_ID_TOGGLE_NOTES);
                 System.Diagnostics.Debug.WriteLine(AppConstants.HotkeyMsg.MSG_UNREGISTER_DONE);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine(AppConstants.HotkeyMsg.MSG_UNREGISTER_ERROR);
+                System.Diagnostics.Debug.WriteLine(string.Format(AppConstants.HotkeyMsg.MSG_UNREGISTER_ERROR, ex.Message));
             }
         }
 
