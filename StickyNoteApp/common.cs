@@ -8,12 +8,6 @@ namespace StickyNoteApp
     /// </summary>
     public static class Common
     {
-        // ログメッセージ定数
-        private const string MSG_BEGIN_RESTORE = "[Common] 復元処理開始";
-        private const string MSG_END_RESTORE = "[Common] 復元処理完了（保存はまだ無効）";
-        private const string MSG_ENABLE_SAVE = "[Common] データベース保存を有効化";
-        private const string MSG_BEGIN_IMAGE_MIGRATE = "[Common] 画像データ移行開始";
-        private const string MSG_END_IMAGE_MIGRATE = "[Common] 画像データ移行完了";
 
         // 復元処理中かどうか
         public static bool IsRestoring { get; private set; } = true;
@@ -35,7 +29,7 @@ namespace StickyNoteApp
         {
             IsRestoring = true;
             IsSaveEnabled = false;
-            Debug.WriteLine(MSG_BEGIN_RESTORE);
+            Debug.WriteLine(AppConstants.CommonMsg.MSG_BEGIN_RESTORE);
         }
 
         /// <summary>
@@ -45,7 +39,7 @@ namespace StickyNoteApp
         {
             IsRestoring = false;
             // ここではまだ保存を有効にしない
-            Debug.WriteLine(MSG_END_RESTORE);
+            Debug.WriteLine(AppConstants.CommonMsg.MSG_END_RESTORE);
         }
 
         /// <summary>
@@ -54,7 +48,7 @@ namespace StickyNoteApp
         public static void EnableSave()
         {
             IsSaveEnabled = true;
-            Debug.WriteLine(MSG_ENABLE_SAVE);
+            Debug.WriteLine(AppConstants.CommonMsg.MSG_ENABLE_SAVE);
         }
 
         /// <summary>
@@ -64,7 +58,7 @@ namespace StickyNoteApp
         {
             IsImageMigrating = true;
             IsSaveEnabled = false;
-            Debug.WriteLine(MSG_BEGIN_IMAGE_MIGRATE);
+            Debug.WriteLine(AppConstants.CommonMsg.MSG_BEGIN_IMAGE_MIGRATE);
         }
 
         /// <summary>
@@ -74,7 +68,7 @@ namespace StickyNoteApp
         {
             IsImageMigrating = false;
             IsSaveEnabled = true;
-            Debug.WriteLine(MSG_END_IMAGE_MIGRATE);
+            Debug.WriteLine(AppConstants.CommonMsg.MSG_END_IMAGE_MIGRATE);
         }
     }
 }
