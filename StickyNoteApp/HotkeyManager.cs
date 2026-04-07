@@ -26,10 +26,6 @@ namespace StickyNoteApp
             WinKey = 8
         }
 
-        // ホットキーID
-        private const int HOTKEY_ID_NEW_NOTE = 1;
-        private const int HOTKEY_ID_TOGGLE_NOTES = 2;
-
         // ウィンドウハンドル
         private IntPtr windowHandle;
 
@@ -49,7 +45,7 @@ namespace StickyNoteApp
                 // Ctrl+Shift+N: 新しい付箋を作成
                 bool result1 = RegisterHotKey(
                     windowHandle,
-                    HOTKEY_ID_NEW_NOTE,
+                    AppConstants.HotkeyConfig.HOTKEY_ID_NEW_NOTE,
                     (uint)(KeyModifier.Control | KeyModifier.Shift),
                     (uint)Keys.N
                 );
@@ -57,25 +53,25 @@ namespace StickyNoteApp
                 // Ctrl+Shift+H: すべての付箋を表示/非表示
                 bool result2 = RegisterHotKey(
                     windowHandle,
-                    HOTKEY_ID_TOGGLE_NOTES,
+                    AppConstants.HotkeyConfig.HOTKEY_ID_TOGGLE_NOTES,
                     (uint)(KeyModifier.Control | KeyModifier.Shift),
                     (uint)Keys.H
                 );
 
                 if (result1 && result2)
                 {
-                    System.Diagnostics.Debug.WriteLine("ホットキー登録成功");
+                    System.Diagnostics.Debug.WriteLine(AppConstants.HotkeyMsg.MSG_REGISTER_SUCCESS);
                     return true;
                 }
                 else
                 {
-                    System.Diagnostics.Debug.WriteLine("ホットキー登録失敗");
+                    System.Diagnostics.Debug.WriteLine(AppConstants.HotkeyMsg.MSG_REGISTER_FAIL);
                     return false;
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"ホットキー登録エラー: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine(string.Format(AppConstants.HotkeyMsg.MSG_REGISTER_ERROR, ex.Message));
                 return false;
             }
         }
@@ -87,13 +83,13 @@ namespace StickyNoteApp
         {
             try
             {
-                UnregisterHotKey(windowHandle, HOTKEY_ID_NEW_NOTE);
-                UnregisterHotKey(windowHandle, HOTKEY_ID_TOGGLE_NOTES);
-                System.Diagnostics.Debug.WriteLine("ホットキー解除完了");
+                UnregisterHotKey(windowHandle, AppConstants.HotkeyConfig.HOTKEY_ID_NEW_NOTE);
+                UnregisterHotKey(windowHandle, AppConstants.HotkeyConfig.HOTKEY_ID_TOGGLE_NOTES);
+                System.Diagnostics.Debug.WriteLine(AppConstants.HotkeyMsg.MSG_UNREGISTER_DONE);
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"ホットキー解除エラー: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine(string.Format(AppConstants.HotkeyMsg.MSG_UNREGISTER_ERROR, ex.Message));
             }
         }
 
@@ -104,13 +100,13 @@ namespace StickyNoteApp
         {
             switch (hotkeyId)
             {
-                case HOTKEY_ID_NEW_NOTE:
-                    System.Diagnostics.Debug.WriteLine("ホットキー: 新しい付箋を作成");
+                case AppConstants.HotkeyConfig.HOTKEY_ID_NEW_NOTE:
+                    System.Diagnostics.Debug.WriteLine(AppConstants.HotkeyMsg.MSG_HOTKEY_NEW_NOTE);
                     NewNoteRequested?.Invoke(this, EventArgs.Empty);
                     break;
 
-                case HOTKEY_ID_TOGGLE_NOTES:
-                    System.Diagnostics.Debug.WriteLine("ホットキー: 付箋の表示/非表示切り替え");
+                case AppConstants.HotkeyConfig.HOTKEY_ID_TOGGLE_NOTES:
+                    System.Diagnostics.Debug.WriteLine(AppConstants.HotkeyMsg.MSG_HOTKEY_TOGGLE);
                     ToggleNotesRequested?.Invoke(this, EventArgs.Empty);
                     break;
             }
