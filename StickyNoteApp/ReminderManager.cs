@@ -20,43 +20,6 @@ namespace StickyNoteApp
     public partial class ReminderManager : Form
     {
         // 定数定義
-        // 数値定数
-        private const int TIMER_INTERVAL_MS = 1000; // リマインダー時刻を確認する間隔（ミリ秒）
-        private const int MIN_REMINDER_MINUTES = 1;    // リマインダーとして設定できる最小時間（分）
-        private const int MINUTES_PER_HOUR = 60;   // 1時間あたりの分数（計算用）
-        private const int MAX_REMINDER_HOURS = 24;   // リマインダーとして設定できる最大時間（24時間）
-        private const int MAX_REMINDER_MINUTES = MAX_REMINDER_HOURS * MINUTES_PER_HOUR; // 設定可能な最大時間（1440分＝24時間ちょうどまでOK）
-        private const int COLUMN_NOT_FOUND = -1;   // カラムが見つからない場合の値
-        private const int REMINDER_ENABLED = 1;    // リマインダー有効フラグの値
-
-        // ダイアログタイトル定数
-        private const string TITLE_ERROR = "エラー";
-        private const string TITLE_INPUT_ERROR = "入力エラー";
-        private const string TITLE_REMINDER = "リマインダー";
-        private const string TITLE_REMINDER_SET = "リマインダー設定";
-        private const string TITLE_NOTIFICATION = "付箋リマインダー";
-
-        // メッセージ定数
-        private const string MSG_SET_FAILED = "リマインダーの設定に失敗しました。\n\n{0}";
-        private const string MSG_DIALOG_FAILED = "ダイアログの表示に失敗しました。\n\n{0}";
-        private const string MSG_CANCEL_FAILED = "リマインダーのキャンセルに失敗しました。\n\n{0}";
-        private const string MSG_CANCEL_SUCCESS = "リマインダーをキャンセルしました。";
-        private const string MSG_NO_REMINDER = "設定されているリマインダーはありません。";
-        private const string MSG_NOTIFICATION = "リマインダー通知\n\n{0}";
-        private const string MSG_MIN_MINUTES = "時間は{0}分以上を指定してください。";
-        private const string MSG_MAX_HOURS = "時間は{0}時間({1}分)以内を指定してください。";
-        private const string MSG_NO_NOTE_ID = "付箋IDが指定されていません。";
-        private const string MSG_CONFIRM_SET = "{0}にリマインダーを通知します。\n\n通知時刻: {1:HH:mm:ss}";
-
-        // 時間テキストフォーマット定数
-        private const string TIME_TEXT_HOURS_MINS = "{0}時間{1}分後";
-        private const string TIME_TEXT_HOURS_ONLY = "{0}時間後";
-        private const string TIME_TEXT_MINS_ONLY = "{0}分後";
-
-        // コントロール名定数
-        private const string CONTROL_NUMERIC_HOURS = "NumericUpDownHours";
-        private const string CONTROL_NUMERIC_MINUTES = "NumericUpDownMinutes";
-
         // Timerの宣言を明示的にSystem.Windows.Forms.Timerに変更
         private System.Windows.Forms.Timer ReminderTimer;
         private DateTime ReminderTimeValue;
@@ -127,7 +90,7 @@ namespace StickyNoteApp
 
                 // タイマー作成
                 ReminderTimer = new System.Windows.Forms.Timer();
-                ReminderTimer.Interval = TIMER_INTERVAL_MS;
+                ReminderTimer.Interval = AppConstants.ReminderManagerConfig.TIMER_INTERVAL_MS;
                 ReminderTimer.Tick += ReminderTimer_Tick;
                 ReminderTimer.Start();
             }
@@ -147,8 +110,8 @@ namespace StickyNoteApp
             try
             {
                 // ReminderActiveカラムの存在確認と読み取り
-                int ReminderActiveOrdinal = COLUMN_NOT_FOUND;
-                int ReminderTimeOrdinal = COLUMN_NOT_FOUND;
+                int ReminderActiveOrdinal = AppConstants.ReminderManagerConfig.COLUMN_NOT_FOUND;
+                int ReminderTimeOrdinal = AppConstants.ReminderManagerConfig.COLUMN_NOT_FOUND;
 
                 try
                 {
@@ -169,7 +132,7 @@ namespace StickyNoteApp
 
                 // リマインダーが「有効(1)」かどうかを数値でチェック
                 int ReminderActive = Convert.ToInt32(Reader.GetValue(ReminderActiveOrdinal));
-                if (ReminderActive != REMINDER_ENABLED) // 1 = 有効
+                if (ReminderActive != AppConstants.ReminderManagerConfig.REMINDER_ENABLED) // 1 = 有効
                 {
                     return false;
                 }
@@ -216,17 +179,17 @@ namespace StickyNoteApp
                 // 付箋IDが空の場合はエラー
                 if (string.IsNullOrEmpty(NoteIdParam))
                 {
-                    throw new ArgumentException(MSG_NO_NOTE_ID, nameof(NoteIdParam));
+                    throw new ArgumentException(AppConstants.ReminderManagerMsg.MSG_NO_NOTE_ID, nameof(NoteIdParam));
                 }
 
-                if (Minutes < MIN_REMINDER_MINUTES) // 1分未満の場合はエラー
+                if (Minutes < AppConstants.ReminderManagerConfig.MIN_REMINDER_MINUTES) // 1分未満の場合はエラー
                 {
-                    throw new ArgumentException(string.Format(MSG_MIN_MINUTES, MIN_REMINDER_MINUTES), nameof(Minutes));
+                    throw new ArgumentException(string.Format(AppConstants.ReminderManagerMsg.MSG_MIN_MINUTES, AppConstants.ReminderManagerConfig.MIN_REMINDER_MINUTES), nameof(Minutes));
                 }
 
-                if (Minutes > MAX_REMINDER_MINUTES) // 最大24時間（1440分）を超える場合はエラー
+                if (Minutes > AppConstants.ReminderManagerConfig.MAX_REMINDER_MINUTES) // 最大24時間（1440分）を超える場合はエラー
                 {
-                    throw new ArgumentException(string.Format(MSG_MAX_HOURS, MAX_REMINDER_HOURS, MAX_REMINDER_MINUTES), nameof(Minutes));
+                    throw new ArgumentException(string.Format(AppConstants.ReminderManagerMsg.MSG_MAX_HOURS, AppConstants.ReminderManagerConfig.MAX_REMINDER_HOURS, AppConstants.ReminderManagerConfig.MAX_REMINDER_MINUTES), nameof(Minutes));
                 }
 
                 NoteId = NoteIdParam;
@@ -239,7 +202,7 @@ namespace StickyNoteApp
 
                 // 新しいタイマーを作成(1秒ごとにチェック)
                 ReminderTimer = new System.Windows.Forms.Timer();
-                ReminderTimer.Interval = TIMER_INTERVAL_MS;
+                ReminderTimer.Interval = AppConstants.ReminderManagerConfig.TIMER_INTERVAL_MS;
                 ReminderTimer.Tick += ReminderTimer_Tick;
                 ReminderTimer.Start();
 
@@ -248,7 +211,7 @@ namespace StickyNoteApp
             }
             catch (Exception Ex)
             {
-                MessageBox.Show(string.Format(MSG_SET_FAILED, Ex.Message), TITLE_ERROR,
+                MessageBox.Show(string.Format(AppConstants.ReminderManagerMsg.MSG_SET_FAILED, Ex.Message), AppConstants.SharedTitle.ERROR,
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
                 throw;
             }
@@ -358,8 +321,8 @@ namespace StickyNoteApp
             try
             {
                 MessageBox.Show(
-                    string.Format(MSG_NOTIFICATION, NoteContent),
-                    TITLE_NOTIFICATION,
+                    string.Format(AppConstants.ReminderManagerMsg.MSG_NOTIFICATION, NoteContent),
+                    AppConstants.ReminderManagerTitle.TITLE_NOTIFICATION,
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information
                 );
@@ -400,14 +363,14 @@ namespace StickyNoteApp
                 {
                     if (InputForm.ShowDialog() == DialogResult.OK)
                     {
-                        var Hours = (int)InputForm.Controls[CONTROL_NUMERIC_HOURS].Tag;
-                        var Minutes = (int)InputForm.Controls[CONTROL_NUMERIC_MINUTES].Tag;
-                        int TotalMinutes = (Hours * MINUTES_PER_HOUR) + Minutes;
+                        var Hours = (int)InputForm.Controls[AppConstants.ReminderManagerConfig.CONTROL_NUMERIC_HOURS].Tag;
+                        var Minutes = (int)InputForm.Controls[AppConstants.ReminderManagerConfig.CONTROL_NUMERIC_MINUTES].Tag;
+                        int TotalMinutes = (Hours * AppConstants.ReminderManagerConfig.MINUTES_PER_HOUR) + Minutes;
 
                         // 0時間0分のチェック
-                        if (TotalMinutes < MIN_REMINDER_MINUTES)
+                        if (TotalMinutes < AppConstants.ReminderManagerConfig.MIN_REMINDER_MINUTES)
                         {
-                            MessageBox.Show(string.Format(MSG_MIN_MINUTES, MIN_REMINDER_MINUTES), TITLE_INPUT_ERROR,
+                            MessageBox.Show(string.Format(AppConstants.ReminderManagerMsg.MSG_MIN_MINUTES, AppConstants.ReminderManagerConfig.MIN_REMINDER_MINUTES), AppConstants.ReminderManagerTitle.TITLE_INPUT_ERROR,
                                 MessageBoxButtons.OK, MessageBoxIcon.Warning);
                             return;
                         }
@@ -418,7 +381,7 @@ namespace StickyNoteApp
             }
             catch (Exception Ex)
             {
-                MessageBox.Show(string.Format(MSG_DIALOG_FAILED, Ex.Message), TITLE_ERROR,
+                MessageBox.Show(string.Format(AppConstants.ReminderManagerMsg.MSG_DIALOG_FAILED, Ex.Message), AppConstants.SharedTitle.ERROR,
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -446,33 +409,33 @@ namespace StickyNoteApp
                 DateTime ConfirmTime = DateTime.Now.AddMinutes(Minutes);
 
                 // 時間と分を計算して表示
-                int Hours = Minutes / MINUTES_PER_HOUR;
-                int Mins = Minutes % MINUTES_PER_HOUR;
+                int Hours = Minutes / AppConstants.ReminderManagerConfig.MINUTES_PER_HOUR;
+                int Mins = Minutes % AppConstants.ReminderManagerConfig.MINUTES_PER_HOUR;
 
                 string TimeText;
                 if (Hours > 0 && Mins > 0)
                 {
-                    TimeText = string.Format(TIME_TEXT_HOURS_MINS, Hours, Mins);
+                    TimeText = string.Format(AppConstants.ReminderManagerConfig.TIME_TEXT_HOURS_MINS, Hours, Mins);
                 }
                 else if (Hours > 0)
                 {
-                    TimeText = string.Format(TIME_TEXT_HOURS_ONLY, Hours);
+                    TimeText = string.Format(AppConstants.ReminderManagerConfig.TIME_TEXT_HOURS_ONLY, Hours);
                 }
                 else
                 {
-                    TimeText = string.Format(TIME_TEXT_MINS_ONLY, Mins);
+                    TimeText = string.Format(AppConstants.ReminderManagerConfig.TIME_TEXT_MINS_ONLY, Mins);
                 }
 
                 MessageBox.Show(
-                    string.Format(MSG_CONFIRM_SET, TimeText, ConfirmTime),
-                    TITLE_REMINDER_SET,
+                    string.Format(AppConstants.ReminderManagerMsg.MSG_CONFIRM_SET, TimeText, ConfirmTime),
+                    AppConstants.ReminderManagerTitle.TITLE_REMINDER_SET,
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information
                 );
             }
             catch (Exception Ex)
             {
-                MessageBox.Show(string.Format(MSG_SET_FAILED, Ex.Message), TITLE_ERROR,
+                MessageBox.Show(string.Format(AppConstants.ReminderManagerMsg.MSG_SET_FAILED, Ex.Message), AppConstants.SharedTitle.ERROR,
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -487,18 +450,18 @@ namespace StickyNoteApp
                 if (IsActive)
                 {
                     CancelReminder();
-                    MessageBox.Show(MSG_CANCEL_SUCCESS, TITLE_REMINDER,
+                    MessageBox.Show(AppConstants.ReminderManagerMsg.MSG_CANCEL_SUCCESS, AppConstants.ReminderManagerTitle.TITLE_REMINDER,
                         MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
                 else
                 {
-                    MessageBox.Show(MSG_NO_REMINDER, TITLE_REMINDER,
+                    MessageBox.Show(AppConstants.ReminderManagerMsg.MSG_NO_REMINDER, AppConstants.ReminderManagerTitle.TITLE_REMINDER,
                         MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
             }
             catch (Exception Ex)
             {
-                MessageBox.Show(string.Format(MSG_CANCEL_FAILED, Ex.Message), TITLE_ERROR,
+                MessageBox.Show(string.Format(AppConstants.ReminderManagerMsg.MSG_CANCEL_FAILED, Ex.Message), AppConstants.SharedTitle.ERROR,
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
