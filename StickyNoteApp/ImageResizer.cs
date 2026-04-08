@@ -12,54 +12,6 @@ namespace StickyNoteApp
     /// </summary>
     public class ImageResizer
     {
-        // ログメッセージ定数
-        private const string MSG_SKIP_ANIMATED_GIF = "アニメーションGIFはリサイズをスキップします: {0}";
-        private const string MSG_RESIZE_SAVED = "リサイズ画像を保存しました: {0}";
-        private const string MSG_RESIZE_ERROR = "画像リサイズエラー: {0}";
-        private const string MSG_RESIZE_ERROR_THROW = "画像のリサイズに失敗しました: {0}";
-        private const string MSG_DELETE_RESIZED = "リサイズ済み画像を削除しました: {0}";
-        private const string MSG_DELETE_RESIZED_FAIL = "リサイズ済み画像の削除に失敗: {0}";
-        private const string MSG_SAVE_CANCELLED = "保存がキャンセルされました";
-        private const string MSG_SAVE_TO_USER = "ユーザー指定場所に保存: {0}";
-        private const string MSG_SAVE_ERROR = "画像保存エラー: {0}";
-        private const string MSG_SAVE_ORIGINAL = "元画像を保存: {0}";
-        private const string MSG_SAVE_ORIGINAL_ERROR = "元画像保存エラー: {0}";
-
-        // ダイアログ・メッセージ定数
-        private const string MSG_ANIMATED_GIF_CANNOT_RESIZE = "アニメーションGIFはリサイズできません。";
-        private const string TITLE_INFO = "情報";
-        private const string MSG_SAVE_COMPLETE = "リサイズ済み画像を保存しました。\n\n保存先: {0}";
-        private const string TITLE_SAVE_COMPLETE = "保存完了";
-        private const string MSG_SAVE_FAILED = "画像の保存に失敗しました:\n{0}";
-        private const string TITLE_ERROR = "エラー";
-        private const string MSG_ORIGINAL_SAVE_COMPLETE = "元画像を保存しました。\n\n保存先: {0}";
-        private const string MSG_ORIGINAL_SAVE_FAILED = "元画像の保存に失敗しました:\n{0}";
-
-        // ファイルダイアログ定数
-        private const string FILTER_RESIZE_IMAGE = "PNG画像|*.png|JPEG画像|*.jpg;*.jpeg|すべてのファイル|*.*";
-        private const string FILTER_ORIGINAL_IMAGE = "PNG画像|*.png|JPEG画像|*.jpg;*.jpeg|GIF画像|*.gif|BMP画像|*.bmp|すべてのファイル|*.*";
-        private const string TITLE_SAVE_RESIZED = "リサイズ済み画像を保存";
-        private const string TITLE_SAVE_ORIGINAL = "元画像を保存";
-        private const string DEFAULT_EXT_PNG = "png";
-
-        // ファイル名フォーマット定数
-        private const string RESIZED_FILE_NAME_FORMAT = "{0}_resized_{1}px_{2:yyyyMMddHHmmss}{3}";
-        private const string RESIZED_SUGGEST_FORMAT = "{0}_{1}px";
-
-        // 拡張子定数
-        private const string EXT_GIF = ".gif";
-        private const string EXT_PNG = ".png";
-        private const string EXT_JPG = ".jpg";
-        private const string EXT_JPEG = ".jpeg";
-        private const string EXT_BMP = ".bmp";
-
-        // 引数エラーメッセージ定数
-        private const string ARG_ERR_IMAGE_NULL = "高さは正の値である必要があります。";
-        private const string ARG_ERR_FILE_NOT_FOUND = "元画像ファイルが見つかりません。";
-
-        // 数値定数
-        private const int MIN_WIDTH = 1;
-
         private readonly string ImageFolder;
 
         /// <summary>
@@ -97,13 +49,13 @@ namespace StickyNoteApp
                 throw new ArgumentNullException(nameof(OriginalImage));
 
             if (NewHeight <= 0)
-                throw new ArgumentException(ARG_ERR_IMAGE_NULL, nameof(NewHeight));
+                throw new ArgumentException(AppConstants.ImageResizerConfig.ARG_ERR_IMAGE_NULL, nameof(NewHeight));
 
             // アスペクト比を維持して幅を計算
             int NewWidth = (int)(OriginalImage.Width * ((double)NewHeight / OriginalImage.Height));
 
             // 幅が0にならないようにする
-            if (NewWidth <= 0) NewWidth = MIN_WIDTH;
+            if (NewWidth <= 0) NewWidth = AppConstants.ImageResizerConfig.MIN_WIDTH;
 
             // リサイズ後の画像を作成
             Bitmap ResizedBitmap = new Bitmap(NewWidth, NewHeight);
@@ -130,7 +82,7 @@ namespace StickyNoteApp
                 throw new ArgumentNullException(nameof(OriginalImagePath));
 
             if (!File.Exists(OriginalImagePath))
-                throw new FileNotFoundException(ARG_ERR_FILE_NOT_FOUND, OriginalImagePath);
+                throw new FileNotFoundException(AppConstants.ImageResizerConfig.ARG_ERR_FILE_NOT_FOUND, OriginalImagePath);
 
             // 元画像の拡張子を取得
             string OriginalExt = Path.GetExtension(OriginalImagePath).ToLower();
@@ -138,7 +90,7 @@ namespace StickyNoteApp
             // GIFアニメーションの場合はリサイズしない（アニメーション情報が失われるため）
             if (IsAnimatedGif(OriginalImagePath))
             {
-                System.Diagnostics.Debug.WriteLine(string.Format(MSG_SKIP_ANIMATED_GIF, OriginalImagePath));
+                System.Diagnostics.Debug.WriteLine(string.Format(AppConstants.ImageResizerMsg.MSG_SKIP_ANIMATED_GIF, OriginalImagePath));
                 return null; // リサイズしない場合はnullを返す
             }
 
@@ -158,22 +110,22 @@ namespace StickyNoteApp
                         }
 
                         // 保存ファイル名を生成（付箋ID_resized_高さpx_タイムスタンプ.拡張子）
-                        string Ext = (OriginalExt == EXT_GIF) ? EXT_GIF : EXT_PNG;
-                        string FileName = string.Format(RESIZED_FILE_NAME_FORMAT, NoteId, NewHeight, DateTime.Now, Ext);
+                        string Ext = (OriginalExt == AppConstants.SharedImage.EXT_GIF) ? AppConstants.SharedImage.EXT_GIF : AppConstants.SharedImage.EXT_PNG;
+                        string FileName = string.Format(AppConstants.ImageResizerConfig.RESIZED_FILE_NAME_FORMAT, NoteId, NewHeight, DateTime.Now, Ext);
                         string SavePath = Path.Combine(Folder, FileName);
 
                         // 画像形式を決定してファイルに保存
                         ResizedBitmap.Save(SavePath, GetImageFormat(Ext));
 
-                        System.Diagnostics.Debug.WriteLine(string.Format(MSG_RESIZE_SAVED, SavePath));
+                        System.Diagnostics.Debug.WriteLine(string.Format(AppConstants.ImageResizerMsg.MSG_RESIZE_SAVED, SavePath));
                         return SavePath;
                     }
                 }
             }
             catch (Exception Ex)
             {
-                System.Diagnostics.Debug.WriteLine(string.Format(MSG_RESIZE_ERROR, Ex.Message));
-                throw new Exception(string.Format(MSG_RESIZE_ERROR_THROW, Ex.Message), Ex);
+                System.Diagnostics.Debug.WriteLine(string.Format(AppConstants.ImageResizerMsg.MSG_RESIZE_ERROR, Ex.Message));
+                throw new Exception(string.Format(AppConstants.ImageResizerMsg.MSG_RESIZE_ERROR_THROW, Ex.Message), Ex);
             }
         }
 
@@ -209,14 +161,14 @@ namespace StickyNoteApp
         {
             switch (Extension.ToLower())
             {
-                case EXT_JPG:
-                case EXT_JPEG:
+                case AppConstants.SharedImage.EXT_JPG:
+                case AppConstants.SharedImage.EXT_JPEG:
                     return ImageFormat.Jpeg;
-                case EXT_GIF:
+                case AppConstants.SharedImage.EXT_GIF:
                     return ImageFormat.Gif;
-                case EXT_BMP:
+                case AppConstants.SharedImage.EXT_BMP:
                     return ImageFormat.Bmp;
-                case EXT_PNG:
+                case AppConstants.SharedImage.EXT_PNG:
                 default:
                     return ImageFormat.Png; // デフォルトはPNG
             }
@@ -234,11 +186,11 @@ namespace StickyNoteApp
             try
             {
                 File.Delete(ResizedImagePath);
-                System.Diagnostics.Debug.WriteLine(string.Format(MSG_DELETE_RESIZED, ResizedImagePath));
+                System.Diagnostics.Debug.WriteLine(string.Format(AppConstants.ImageResizerMsg.MSG_DELETE_RESIZED, ResizedImagePath));
             }
             catch (Exception Ex)
             {
-                System.Diagnostics.Debug.WriteLine(string.Format(MSG_DELETE_RESIZED_FAIL, Ex.Message));
+                System.Diagnostics.Debug.WriteLine(string.Format(AppConstants.ImageResizerMsg.MSG_DELETE_RESIZED_FAIL, Ex.Message));
                 // エラーが発生しても処理は続行
             }
         }
@@ -257,12 +209,12 @@ namespace StickyNoteApp
                 throw new ArgumentNullException(nameof(OriginalImagePath));
 
             if (!File.Exists(OriginalImagePath))
-                throw new FileNotFoundException(ARG_ERR_FILE_NOT_FOUND, OriginalImagePath);
+                throw new FileNotFoundException(AppConstants.ImageResizerConfig.ARG_ERR_FILE_NOT_FOUND, OriginalImagePath);
 
             // GIFアニメーションの場合はリサイズしない
             if (IsAnimatedGif(OriginalImagePath))
             {
-                MessageBox.Show(MSG_ANIMATED_GIF_CANNOT_RESIZE, TITLE_INFO, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show(AppConstants.ImageResizerMsg.MSG_ANIMATED_GIF_CANNOT_RESIZE, AppConstants.SharedTitle.INFO, MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return null;
             }
 
@@ -277,11 +229,11 @@ namespace StickyNoteApp
                         // SaveFileDialogで保存先を選択
                         using (var SaveDialog = new SaveFileDialog())
                         {
-                            SaveDialog.FileName = string.Format(RESIZED_SUGGEST_FORMAT, SuggestedFileName, NewHeight);
-                            SaveDialog.Filter = FILTER_RESIZE_IMAGE;
+                            SaveDialog.FileName = string.Format(AppConstants.ImageResizerConfig.RESIZED_SUGGEST_FORMAT, SuggestedFileName, NewHeight);
+                            SaveDialog.Filter = AppConstants.ImageResizerConfig.FILTER_RESIZE_IMAGE;
                             SaveDialog.FilterIndex = 1; // デフォルトはPNG
-                            SaveDialog.Title = TITLE_SAVE_RESIZED;
-                            SaveDialog.DefaultExt = DEFAULT_EXT_PNG;
+                            SaveDialog.Title = AppConstants.ImageResizerTitle.TITLE_SAVE_RESIZED;
+                            SaveDialog.DefaultExt = AppConstants.ImageResizerConfig.DEFAULT_EXT_PNG;
 
                             if (SaveDialog.ShowDialog() == DialogResult.OK)
                             {
@@ -290,11 +242,11 @@ namespace StickyNoteApp
                                 // ファイルに保存
                                 ResizedBitmap.Save(SavePath, GetImageFormat(Ext));
 
-                                System.Diagnostics.Debug.WriteLine(string.Format(MSG_SAVE_TO_USER, SavePath));
+                                System.Diagnostics.Debug.WriteLine(string.Format(AppConstants.ImageResizerMsg.MSG_SAVE_TO_USER, SavePath));
 
                                 MessageBox.Show(
-                                    string.Format(MSG_SAVE_COMPLETE, SavePath),
-                                    TITLE_SAVE_COMPLETE,
+                                    string.Format(AppConstants.ImageResizerMsg.MSG_SAVE_COMPLETE, SavePath),
+                                    AppConstants.ImageResizerTitle.TITLE_SAVE_COMPLETE,
                                     MessageBoxButtons.OK,
                                     MessageBoxIcon.Information);
 
@@ -302,7 +254,7 @@ namespace StickyNoteApp
                             }
                             else
                             {
-                                System.Diagnostics.Debug.WriteLine(MSG_SAVE_CANCELLED);
+                                System.Diagnostics.Debug.WriteLine(AppConstants.ImageResizerMsg.MSG_SAVE_CANCELLED);
                                 return null;
                             }
                         }
@@ -311,10 +263,10 @@ namespace StickyNoteApp
             }
             catch (Exception Ex)
             {
-                System.Diagnostics.Debug.WriteLine(string.Format(MSG_SAVE_ERROR, Ex.Message));
+                System.Diagnostics.Debug.WriteLine(string.Format(AppConstants.ImageResizerMsg.MSG_SAVE_ERROR, Ex.Message));
                 MessageBox.Show(
-                    string.Format(MSG_SAVE_FAILED, Ex.Message),
-                    TITLE_ERROR,
+                    string.Format(AppConstants.ImageResizerMsg.MSG_SAVE_FAILED, Ex.Message),
+                    AppConstants.SharedTitle.ERROR,
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
                 return null;
@@ -361,21 +313,21 @@ namespace StickyNoteApp
                 {
                     // 元画像の拡張子を取得
                     string OriginalExt = Path.GetExtension(OriginalImagePath).ToLower();
-                    string DefaultExt = string.IsNullOrEmpty(OriginalExt) ? DEFAULT_EXT_PNG : OriginalExt.TrimStart('.');
+                    string DefaultExt = string.IsNullOrEmpty(OriginalExt) ? AppConstants.ImageResizerConfig.DEFAULT_EXT_PNG : OriginalExt.TrimStart('.');
 
                     SaveDialog.FileName = SuggestedFileName;
-                    SaveDialog.Filter = FILTER_ORIGINAL_IMAGE;
-                    SaveDialog.Title = TITLE_SAVE_ORIGINAL;
+                    SaveDialog.Filter = AppConstants.ImageResizerConfig.FILTER_ORIGINAL_IMAGE;
+                    SaveDialog.Title = AppConstants.ImageResizerTitle.TITLE_SAVE_ORIGINAL;
                     SaveDialog.DefaultExt = DefaultExt;
 
                     // 元画像の拡張子に応じてFilterIndexを設定
                     switch (OriginalExt)
                     {
-                        case EXT_PNG: SaveDialog.FilterIndex = 1; break;
-                        case EXT_JPG:
-                        case EXT_JPEG: SaveDialog.FilterIndex = 2; break;
-                        case EXT_GIF: SaveDialog.FilterIndex = 3; break;
-                        case EXT_BMP: SaveDialog.FilterIndex = 4; break;
+                        case AppConstants.SharedImage.EXT_PNG: SaveDialog.FilterIndex = 1; break;
+                        case AppConstants.SharedImage.EXT_JPG:
+                        case AppConstants.SharedImage.EXT_JPEG: SaveDialog.FilterIndex = 2; break;
+                        case AppConstants.SharedImage.EXT_GIF: SaveDialog.FilterIndex = 3; break;
+                        case AppConstants.SharedImage.EXT_BMP: SaveDialog.FilterIndex = 4; break;
                         default: SaveDialog.FilterIndex = 1; break; // デフォルトはPNG
                     }
 
@@ -384,11 +336,11 @@ namespace StickyNoteApp
                         // 元画像をコピー
                         File.Copy(OriginalImagePath, SaveDialog.FileName, true);
 
-                        System.Diagnostics.Debug.WriteLine(string.Format(MSG_SAVE_ORIGINAL, SaveDialog.FileName));
+                        System.Diagnostics.Debug.WriteLine(string.Format(AppConstants.ImageResizerMsg.MSG_SAVE_ORIGINAL, SaveDialog.FileName));
 
                         MessageBox.Show(
-                            string.Format(MSG_ORIGINAL_SAVE_COMPLETE, SaveDialog.FileName),
-                            TITLE_SAVE_COMPLETE,
+                            string.Format(AppConstants.ImageResizerMsg.MSG_ORIGINAL_SAVE_COMPLETE, SaveDialog.FileName),
+                            AppConstants.ImageResizerTitle.TITLE_SAVE_COMPLETE,
                             MessageBoxButtons.OK,
                             MessageBoxIcon.Information);
 
@@ -402,10 +354,10 @@ namespace StickyNoteApp
             }
             catch (Exception Ex)
             {
-                System.Diagnostics.Debug.WriteLine(string.Format(MSG_SAVE_ORIGINAL_ERROR, Ex.Message));
+                System.Diagnostics.Debug.WriteLine(string.Format(AppConstants.ImageResizerMsg.MSG_SAVE_ORIGINAL_ERROR, Ex.Message));
                 MessageBox.Show(
-                    string.Format(MSG_ORIGINAL_SAVE_FAILED, Ex.Message),
-                    TITLE_ERROR,
+                    string.Format(AppConstants.ImageResizerMsg.MSG_ORIGINAL_SAVE_FAILED, Ex.Message),
+                    AppConstants.SharedTitle.ERROR,
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
                 return null;
