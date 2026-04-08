@@ -608,19 +608,19 @@ namespace StickyNoteApp
             var saveAsImageItem = new ToolStripMenuItem("名前を付けて保存");
 
             var saveAsSmallItem = new ToolStripMenuItem("小 (100px) で保存");
-            saveAsSmallItem.Click += (s, e) => imageResizeManager?.SaveResizedImageToUserLocation(ImageResizeManager.SIZE_SMALL);
+            saveAsSmallItem.Click += (s, e) => imageResizeManager?.SaveResizedImageToUserLocation(AppConstants.ImageResizeManagerConfig.SIZE_SMALL);
             saveAsImageItem.DropDownItems.Add(saveAsSmallItem);
 
             var saveAsMediumItem = new ToolStripMenuItem("中 (150px) で保存");
-            saveAsMediumItem.Click += (s, e) => imageResizeManager?.SaveResizedImageToUserLocation(ImageResizeManager.SIZE_MEDIUM);
+            saveAsMediumItem.Click += (s, e) => imageResizeManager?.SaveResizedImageToUserLocation(AppConstants.ImageResizeManagerConfig.SIZE_MEDIUM);
             saveAsImageItem.DropDownItems.Add(saveAsMediumItem);
 
             var saveAsLargeItem = new ToolStripMenuItem("大 (200px) で保存");
-            saveAsLargeItem.Click += (s, e) => imageResizeManager?.SaveResizedImageToUserLocation(ImageResizeManager.SIZE_LARGE);
+            saveAsLargeItem.Click += (s, e) => imageResizeManager?.SaveResizedImageToUserLocation(AppConstants.ImageResizeManagerConfig.SIZE_LARGE);
             saveAsImageItem.DropDownItems.Add(saveAsLargeItem);
 
             var saveAsExtraLargeItem = new ToolStripMenuItem("特大 (250px) で保存");
-            saveAsExtraLargeItem.Click += (s, e) => imageResizeManager?.SaveResizedImageToUserLocation(ImageResizeManager.SIZE_EXTRA_LARGE);
+            saveAsExtraLargeItem.Click += (s, e) => imageResizeManager?.SaveResizedImageToUserLocation(AppConstants.ImageResizeManagerConfig.SIZE_EXTRA_LARGE);
             saveAsImageItem.DropDownItems.Add(saveAsExtraLargeItem);
 
             saveAsImageItem.DropDownItems.Add(new ToolStripSeparator()); // 区切り線
