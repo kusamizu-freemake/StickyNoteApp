@@ -11,35 +11,6 @@ namespace StickyNoteApp
     /// </summary>
     public class ImageResizeManager
     {
-        // サイズ定数（唯一のソース）
-        public const int SIZE_SMALL = 100; // 小
-        public const int SIZE_MEDIUM = 150; // 中（デフォルト）
-        public const int SIZE_LARGE = 200; // 大
-        public const int SIZE_EXTRA_LARGE = 250; // 特大
-
-        // 数値定数
-        private const int MIN_TEXT_AREA_HEIGHT = 80; // テキスト領域の最小高さ
-        private const int DEFAULT_TITLE_BAR_HEIGHT = 40;
-
-        // ログメッセージ定数
-        private const string MSG_NO_ORIGINAL_PATH = "元画像パスが設定されていません";
-        private const string MSG_RESIZE_SUCCESS = "リサイズ成功: {0}";
-        private const string MSG_RESIZE_SKIPPED = "リサイズをスキップしました（アニメーションGIFまたはエラー）";
-        private const string MSG_AUTO_ADJUST = "付箋サイズを自動調整: {0}px (画像: {1}px, テキスト領域: {2}px確保)";
-
-        // ダイアログ・メッセージ定数
-        private const string MSG_NO_IMAGE_TO_SAVE = "保存する画像がありません。";
-        private const string TITLE_INFO = "情報";
-
-        // メニューラベル定数
-        private const string MENU_LABEL_SMALL = "小 (100px)";
-        private const string MENU_LABEL_MEDIUM = "中 (150px)";
-        private const string MENU_LABEL_LARGE = "大 (200px)";
-        private const string MENU_LABEL_EXTRA_LARGE = "特大 (250px)";
-
-        // コントロール名定数
-        private const string CONTROL_TITLE_BAR = "titleBar";
-
         // 依存オブジェクト
         private readonly StickyNoteForm ParentForm;
         private readonly PictureBox PictureBox;
@@ -78,7 +49,7 @@ namespace StickyNoteApp
 
             if (string.IsNullOrEmpty(OriginalPath))
             {
-                Debug.WriteLine(MSG_NO_ORIGINAL_PATH);
+                Debug.WriteLine(AppConstants.ImageResizeManagerMsg.MSG_NO_ORIGINAL_PATH);
                 return;
             }
 
@@ -97,14 +68,14 @@ namespace StickyNoteApp
 
             if (NewResizedPath != null)
             {
-                Debug.WriteLine(string.Format(MSG_RESIZE_SUCCESS, NewResizedPath));
+                Debug.WriteLine(string.Format(AppConstants.ImageResizeManagerMsg.MSG_RESIZE_SUCCESS, NewResizedPath));
 
                 // 4. ImageManagerに新しいパスを設定
                 ImageManager.SetResizedImagePath(NewResizedPath);
             }
             else
             {
-                Debug.WriteLine(MSG_RESIZE_SKIPPED);
+                Debug.WriteLine(AppConstants.ImageResizeManagerMsg.MSG_RESIZE_SKIPPED);
             }
 
             // 5. 表示サイズを変更
@@ -127,22 +98,22 @@ namespace StickyNoteApp
         private void EnsureTextAreaVisible(int ImageHeight)
         {
             // タイトルバーの高さを取得
-            int TitleBarHeight = ParentForm.Controls[CONTROL_TITLE_BAR]?.Height ?? DEFAULT_TITLE_BAR_HEIGHT;
+            int TitleBarHeight = ParentForm.Controls[AppConstants.SharedImage.CONTROL_TITLE_BAR]?.Height ?? AppConstants.SharedImage.DEFAULT_TITLE_BAR_HEIGHT;
 
             // 現在のテキスト領域の高さを計算
             int CurrentTextHeight = ParentForm.ClientSize.Height - TitleBarHeight - ImageHeight;
 
             // テキスト領域が最小高さより小さい場合、付箋を拡大
-            if (CurrentTextHeight < MIN_TEXT_AREA_HEIGHT)
+            if (CurrentTextHeight < AppConstants.SharedImage.MIN_TEXT_AREA_HEIGHT)
             {
-                int RequiredHeight = TitleBarHeight + ImageHeight + MIN_TEXT_AREA_HEIGHT;
+                int RequiredHeight = TitleBarHeight + ImageHeight + AppConstants.SharedImage.MIN_TEXT_AREA_HEIGHT;
                 ParentForm.ClientSize = new Size(ParentForm.ClientSize.Width, RequiredHeight);
 
                 // サイズ変更後、再度テキストボックスの位置を調整
                 ImageManager.AdjustTextBoxPosition();
 
-                Debug.WriteLine(string.Format(MSG_AUTO_ADJUST,
-                    ParentForm.ClientSize.Height, ImageHeight, MIN_TEXT_AREA_HEIGHT));
+                Debug.WriteLine(string.Format(AppConstants.ImageResizeManagerMsg.MSG_AUTO_ADJUST,
+                    ParentForm.ClientSize.Height, ImageHeight, AppConstants.SharedImage.MIN_TEXT_AREA_HEIGHT));
             }
         }
 
@@ -156,7 +127,7 @@ namespace StickyNoteApp
 
             if (string.IsNullOrEmpty(OriginalPath))
             {
-                MessageBox.Show(MSG_NO_IMAGE_TO_SAVE, TITLE_INFO, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show(AppConstants.ImageResizeManagerMsg.MSG_NO_IMAGE_TO_SAVE, AppConstants.SharedTitle.INFO, MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
@@ -184,10 +155,10 @@ namespace StickyNoteApp
         {
             var Items = new (string Label, int Size)[]
             {
-                (MENU_LABEL_SMALL,       SIZE_SMALL),
-                (MENU_LABEL_MEDIUM,      SIZE_MEDIUM),
-                (MENU_LABEL_LARGE,       SIZE_LARGE),
-                (MENU_LABEL_EXTRA_LARGE, SIZE_EXTRA_LARGE),
+                (AppConstants.ImageResizeManagerConfig.MENU_LABEL_SMALL,       AppConstants.ImageResizeManagerConfig.SIZE_SMALL),
+                (AppConstants.ImageResizeManagerConfig.MENU_LABEL_MEDIUM,      AppConstants.ImageResizeManagerConfig.SIZE_MEDIUM),
+                (AppConstants.ImageResizeManagerConfig.MENU_LABEL_LARGE,       AppConstants.ImageResizeManagerConfig.SIZE_LARGE),
+                (AppConstants.ImageResizeManagerConfig.MENU_LABEL_EXTRA_LARGE, AppConstants.ImageResizeManagerConfig.SIZE_EXTRA_LARGE),
             };
 
             foreach (var (Label, Size) in Items)
