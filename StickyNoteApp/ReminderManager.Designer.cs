@@ -111,7 +111,7 @@ namespace StickyNoteApp
             LabelHours.Top = LABEL_H_TOP;
             LabelHours.Width = LABEL_H_WIDTH;
 
-            NumericUpDownHours.Name = CONTROL_NUMERIC_HOURS;
+            NumericUpDownHours.Name = AppConstants.ReminderManagerConfig.CONTROL_NUMERIC_HOURS;
             NumericUpDownHours.Left = NUMERIC_H_LEFT;
             NumericUpDownHours.Top = NUMERIC_H_TOP;
             NumericUpDownHours.Width = NUMERIC_H_WIDTH;
@@ -130,7 +130,7 @@ namespace StickyNoteApp
             LabelMinutes.Top = LABEL_M_TOP;
             LabelMinutes.Width = LABEL_M_WIDTH;
 
-            NumericUpDownMinutes.Name = CONTROL_NUMERIC_MINUTES;
+            NumericUpDownMinutes.Name = AppConstants.ReminderManagerConfig.CONTROL_NUMERIC_MINUTES;
             NumericUpDownMinutes.Left = NUMERIC_M_LEFT;
             NumericUpDownMinutes.Top = NUMERIC_M_TOP;
             NumericUpDownMinutes.Width = NUMERIC_M_WIDTH;
