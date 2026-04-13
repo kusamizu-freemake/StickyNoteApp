@@ -335,6 +335,20 @@ namespace StickyNoteApp
             public const int REMINDER_TIME_60MIN = 60;
         }
 
+        public static class StickyNoteFormLabel
+        {
+            // PictureBox右クリックメニューのラベル
+            public const string MENU_IMAGE_EDIT = "画像を編集（置き換え）";
+            public const string MENU_IMAGE_DELETE = "画像を削除";
+            public const string MENU_IMAGE_SIZE = "画像サイズ";
+            public const string MENU_IMAGE_SAVE_AS = "名前を付けて保存";
+            public const string MENU_SAVE_SMALL = "小 (100px) で保存";
+            public const string MENU_SAVE_MEDIUM = "中 (150px) で保存";
+            public const string MENU_SAVE_LARGE = "大 (200px) で保存";
+            public const string MENU_SAVE_EXTRA_LARGE = "特大 (250px) で保存";
+            public const string MENU_SAVE_ORIGINAL = "元のサイズで保存";
+        }
+
         // TrayManagerForm.cs
         public static class TrayManagerMsg
         {

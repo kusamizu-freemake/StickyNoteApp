@@ -10,30 +10,11 @@ namespace StickyNoteApp
     /// </summary>
     public partial class StickyNoteForm : Form
     {
-        // 定数定義
-
-        // リサイズ関連
-        private const int RESIZE_BORDER_WIDTH = 8; // リサイズ可能な枠の幅
-        private const int MIN_WIDTH = 150; // 最小幅
-        private const int MIN_HEIGHT = 100; // 最小高さ
-
-        // 新規付箋作成時のオフセット
-        private const int NEW_NOTE_OFFSET_X = 30; // 新規付箋のX方向オフセット
-        private const int NEW_NOTE_OFFSET_Y = 30; // 新規付箋のY方向オフセット
-
         // 画像管理
         private PictureBox pictureBox;
         private ImageManager imageManager;
         private ImageResizeManager imageResizeManager;
         private ImageResizer imageResizer;
-
-        // テキストプレビュー関連
-        private const int PREVIEW_TEXT_MAX_LENGTH = 20; // プレビューテキストの最大文字数
-
-        // リマインダー時間（分）
-        private const int REMINDER_TIME_10MIN = 10; // 10分
-        private const int REMINDER_TIME_30MIN = 30; // 30分
-        private const int REMINDER_TIME_60MIN = 60; // 60分
 
         // ドラッグ移動用の変数
         private bool dragging = false;
@@ -337,10 +318,10 @@ namespace StickyNoteApp
             int formWidth = this.ClientSize.Width;
             int formHeight = this.ClientSize.Height;
 
-            bool isLeft = location.X <= RESIZE_BORDER_WIDTH;
-            bool isRight = location.X >= formWidth - RESIZE_BORDER_WIDTH;
-            bool isTop = location.Y <= RESIZE_BORDER_WIDTH;
-            bool isBottom = location.Y >= formHeight - RESIZE_BORDER_WIDTH;
+            bool isLeft = location.X <= AppConstants.StickyNoteFormConfig.RESIZE_BORDER_WIDTH;
+            bool isRight = location.X >= formWidth - AppConstants.StickyNoteFormConfig.RESIZE_BORDER_WIDTH;
+            bool isTop = location.Y <= AppConstants.StickyNoteFormConfig.RESIZE_BORDER_WIDTH;
+            bool isBottom = location.Y >= formHeight - AppConstants.StickyNoteFormConfig.RESIZE_BORDER_WIDTH;
 
             // 角の判定（優先度高）
             if (isTop && isLeft)
@@ -414,13 +395,13 @@ namespace StickyNoteApp
                 // 各方向ごとのサイズと位置の計算
                 // 右方向にリサイズ
                 case ResizeDirection.Right:
-                    newWidth = Math.Max(MIN_WIDTH, resizeStartSize.Width + deltaX);
+                    newWidth = Math.Max(AppConstants.StickyNoteFormConfig.MIN_WIDTH, resizeStartSize.Width + deltaX);
                     break;
 
                 // 左方向にリサイズ
                 case ResizeDirection.Left:
-                    newWidth = Math.Max(MIN_WIDTH, resizeStartSize.Width - deltaX);
-                    if (newWidth > MIN_WIDTH)
+                    newWidth = Math.Max(AppConstants.StickyNoteFormConfig.MIN_WIDTH, resizeStartSize.Width - deltaX);
+                    if (newWidth > AppConstants.StickyNoteFormConfig.MIN_WIDTH)
                     {
                         newLeft = resizeStartLocation.X + deltaX;
                     }
@@ -428,13 +409,13 @@ namespace StickyNoteApp
 
                 // 下方向にリサイズ
                 case ResizeDirection.Bottom:
-                    newHeight = Math.Max(MIN_HEIGHT, resizeStartSize.Height + deltaY);
+                    newHeight = Math.Max(AppConstants.StickyNoteFormConfig.MIN_HEIGHT, resizeStartSize.Height + deltaY);
                     break;
 
                 // 上方向にリサイズ
                 case ResizeDirection.Top:
-                    newHeight = Math.Max(MIN_HEIGHT, resizeStartSize.Height - deltaY);
-                    if (newHeight > MIN_HEIGHT)
+                    newHeight = Math.Max(AppConstants.StickyNoteFormConfig.MIN_HEIGHT, resizeStartSize.Height - deltaY);
+                    if (newHeight > AppConstants.StickyNoteFormConfig.MIN_HEIGHT)
                     {
                         newTop = resizeStartLocation.Y + deltaY;
                     }
@@ -442,15 +423,15 @@ namespace StickyNoteApp
 
                 // 右下方向にリサイズ
                 case ResizeDirection.BottomRight:
-                    newWidth = Math.Max(MIN_WIDTH, resizeStartSize.Width + deltaX);
-                    newHeight = Math.Max(MIN_HEIGHT, resizeStartSize.Height + deltaY);
+                    newWidth = Math.Max(AppConstants.StickyNoteFormConfig.MIN_WIDTH, resizeStartSize.Width + deltaX);
+                    newHeight = Math.Max(AppConstants.StickyNoteFormConfig.MIN_HEIGHT, resizeStartSize.Height + deltaY);
                     break;
 
                 // 左下方向にリサイズ
                 case ResizeDirection.BottomLeft:
-                    newWidth = Math.Max(MIN_WIDTH, resizeStartSize.Width - deltaX);
-                    newHeight = Math.Max(MIN_HEIGHT, resizeStartSize.Height + deltaY);
-                    if (newWidth > MIN_WIDTH)
+                    newWidth = Math.Max(AppConstants.StickyNoteFormConfig.MIN_WIDTH, resizeStartSize.Width - deltaX);
+                    newHeight = Math.Max(AppConstants.StickyNoteFormConfig.MIN_HEIGHT, resizeStartSize.Height + deltaY);
+                    if (newWidth > AppConstants.StickyNoteFormConfig.MIN_WIDTH)
                     {
                         newLeft = resizeStartLocation.X + deltaX;
                     }
@@ -458,9 +439,9 @@ namespace StickyNoteApp
 
                 // 右上方向にリサイズ
                 case ResizeDirection.TopRight:
-                    newWidth = Math.Max(MIN_WIDTH, resizeStartSize.Width + deltaX);
-                    newHeight = Math.Max(MIN_HEIGHT, resizeStartSize.Height - deltaY);
-                    if (newHeight > MIN_HEIGHT)
+                    newWidth = Math.Max(AppConstants.StickyNoteFormConfig.MIN_WIDTH, resizeStartSize.Width + deltaX);
+                    newHeight = Math.Max(AppConstants.StickyNoteFormConfig.MIN_HEIGHT, resizeStartSize.Height - deltaY);
+                    if (newHeight > AppConstants.StickyNoteFormConfig.MIN_HEIGHT)
                     {
                         newTop = resizeStartLocation.Y + deltaY;
                     }
@@ -468,13 +449,13 @@ namespace StickyNoteApp
 
                 // 左上方向にリサイズ
                 case ResizeDirection.TopLeft:
-                    newWidth = Math.Max(MIN_WIDTH, resizeStartSize.Width - deltaX);
-                    newHeight = Math.Max(MIN_HEIGHT, resizeStartSize.Height - deltaY);
-                    if (newWidth > MIN_WIDTH)
+                    newWidth = Math.Max(AppConstants.StickyNoteFormConfig.MIN_WIDTH, resizeStartSize.Width - deltaX);
+                    newHeight = Math.Max(AppConstants.StickyNoteFormConfig.MIN_HEIGHT, resizeStartSize.Height - deltaY);
+                    if (newWidth > AppConstants.StickyNoteFormConfig.MIN_WIDTH)
                     {
                         newLeft = resizeStartLocation.X + deltaX;
                     }
-                    if (newHeight > MIN_HEIGHT)
+                    if (newHeight > AppConstants.StickyNoteFormConfig.MIN_HEIGHT)
                     {
                         newTop = resizeStartLocation.Y + deltaY;
                     }
@@ -519,8 +500,8 @@ namespace StickyNoteApp
                 Database.SaveOrUpdate(this);
 
                 string preview = string.IsNullOrEmpty(txtNote.Text) ? "(空)" :
-                    (txtNote.Text.Length > PREVIEW_TEXT_MAX_LENGTH ?
-                     txtNote.Text.Substring(0, PREVIEW_TEXT_MAX_LENGTH) + "..." :
+                    (txtNote.Text.Length > AppConstants.StickyNoteFormConfig.PREVIEW_TEXT_MAX_LENGTH ?
+                     txtNote.Text.Substring(0, AppConstants.StickyNoteFormConfig.PREVIEW_TEXT_MAX_LENGTH) + "..." :
                      txtNote.Text);
             }
             catch
@@ -587,45 +568,45 @@ namespace StickyNoteApp
             var imageContextMenu = new ContextMenuStrip();
 
             // 画像を編集（置き換え）
-            var inserteditImageItem = new ToolStripMenuItem("画像を編集（置き換え）");
+            var inserteditImageItem = new ToolStripMenuItem(AppConstants.StickyNoteFormLabel.MENU_IMAGE_EDIT);
             inserteditImageItem.Click += (s, e) => imageManager?.SelectAndLoadImageFromFile();
             imageContextMenu.Items.Add(inserteditImageItem);
             imageContextMenu.Items.Add(new ToolStripSeparator()); // 区切り線
 
             // 画像を削除
-            var deleteImageItem = new ToolStripMenuItem("画像を削除");
+            var deleteImageItem = new ToolStripMenuItem(AppConstants.StickyNoteFormLabel.MENU_IMAGE_DELETE);
             deleteImageItem.Click += (s, e) => imageManager?.RemoveImage();
             imageContextMenu.Items.Add(deleteImageItem);
 
             imageContextMenu.Items.Add(new ToolStripSeparator()); // 区切り線
 
             // 画像サイズ変更サブメニュー
-            var resizeImageItem = new ToolStripMenuItem("画像サイズ");
+            var resizeImageItem = new ToolStripMenuItem(AppConstants.StickyNoteFormLabel.MENU_IMAGE_SIZE);
             imageResizeManager.CreateSizeMenuItems(resizeImageItem);
             imageContextMenu.Items.Add(resizeImageItem);
 
             // 名前を付けて保存サブメニュー
-            var saveAsImageItem = new ToolStripMenuItem("名前を付けて保存");
+            var saveAsImageItem = new ToolStripMenuItem(AppConstants.StickyNoteFormLabel.MENU_IMAGE_SAVE_AS);
 
-            var saveAsSmallItem = new ToolStripMenuItem("小 (100px) で保存");
+            var saveAsSmallItem = new ToolStripMenuItem(AppConstants.StickyNoteFormLabel.MENU_SAVE_SMALL);
             saveAsSmallItem.Click += (s, e) => imageResizeManager?.SaveResizedImageToUserLocation(AppConstants.ImageResizeManagerConfig.SIZE_SMALL);
             saveAsImageItem.DropDownItems.Add(saveAsSmallItem);
 
-            var saveAsMediumItem = new ToolStripMenuItem("中 (150px) で保存");
+            var saveAsMediumItem = new ToolStripMenuItem(AppConstants.StickyNoteFormLabel.MENU_SAVE_MEDIUM);
             saveAsMediumItem.Click += (s, e) => imageResizeManager?.SaveResizedImageToUserLocation(AppConstants.ImageResizeManagerConfig.SIZE_MEDIUM);
             saveAsImageItem.DropDownItems.Add(saveAsMediumItem);
 
-            var saveAsLargeItem = new ToolStripMenuItem("大 (200px) で保存");
+            var saveAsLargeItem = new ToolStripMenuItem(AppConstants.StickyNoteFormLabel.MENU_SAVE_LARGE);
             saveAsLargeItem.Click += (s, e) => imageResizeManager?.SaveResizedImageToUserLocation(AppConstants.ImageResizeManagerConfig.SIZE_LARGE);
             saveAsImageItem.DropDownItems.Add(saveAsLargeItem);
 
-            var saveAsExtraLargeItem = new ToolStripMenuItem("特大 (250px) で保存");
+            var saveAsExtraLargeItem = new ToolStripMenuItem(AppConstants.StickyNoteFormLabel.MENU_SAVE_EXTRA_LARGE);
             saveAsExtraLargeItem.Click += (s, e) => imageResizeManager?.SaveResizedImageToUserLocation(AppConstants.ImageResizeManagerConfig.SIZE_EXTRA_LARGE);
             saveAsImageItem.DropDownItems.Add(saveAsExtraLargeItem);
 
             saveAsImageItem.DropDownItems.Add(new ToolStripSeparator()); // 区切り線
 
-            var saveAsOriginalItem = new ToolStripMenuItem("元のサイズで保存");
+            var saveAsOriginalItem = new ToolStripMenuItem(AppConstants.StickyNoteFormLabel.MENU_SAVE_ORIGINAL);
             saveAsOriginalItem.Click += (s, e) => imageResizeManager?.SaveResizedImageToUserLocation(0); // 0は元サイズ
             saveAsImageItem.DropDownItems.Add(saveAsOriginalItem);
 
@@ -646,8 +627,8 @@ namespace StickyNoteApp
         private void PictureBox_DoubleClick(object sender, EventArgs e)
         {
             var result = MessageBox.Show(
-                "画像を削除しますか？",
-                "確認",
+                AppConstants.StickyNoteFormMsg.MSG_CONFIRM_REMOVE_IMAGE,
+                AppConstants.SharedTitle.CONFIRM,
                 MessageBoxButtons.YesNo,
                 MessageBoxIcon.Question
             );
@@ -771,7 +752,7 @@ namespace StickyNoteApp
         /// </summary>
         private void Button_Close_Click(object sender, EventArgs e)
         {
-            if (MessageBox.Show("この付箋を削除しますか？", "確認", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+            if (MessageBox.Show(AppConstants.StickyNoteFormMsg.MSG_CONFIRM_DELETE, AppConstants.SharedTitle.CONFIRM, MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
             {
                 Database.SoftDelete(NoteId);
                 this.Close();
@@ -785,7 +766,7 @@ namespace StickyNoteApp
         {
             StickyNoteForm newNote = new StickyNoteForm();
             // 現在の付箋の近くに表示
-            newNote.Location = new Point(this.Left + NEW_NOTE_OFFSET_X, this.Top + NEW_NOTE_OFFSET_Y);
+            newNote.Location = new Point(this.Left + AppConstants.StickyNoteFormConfig.NEW_NOTE_OFFSET_X, this.Top + AppConstants.StickyNoteFormConfig.NEW_NOTE_OFFSET_Y);
             newNote.Show();
         }
 
@@ -816,7 +797,7 @@ namespace StickyNoteApp
         /// </summary>
         private void StickyNoteMenu_Delete_Click(object sender, EventArgs e)
         {
-            if (MessageBox.Show("この付箋を削除しますか？", "確認", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+            if (MessageBox.Show(AppConstants.StickyNoteFormMsg.MSG_CONFIRM_DELETE, AppConstants.SharedTitle.CONFIRM, MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
             {
                 Database.SoftDelete(NoteId);
                 this.Close();
@@ -925,8 +906,8 @@ namespace StickyNoteApp
             {
                 // 確認メッセージを表示
                 var result = MessageBox.Show(
-                    "画像を削除しますか？",
-                    "確認",
+                    AppConstants.StickyNoteFormMsg.MSG_CONFIRM_REMOVE_IMAGE,
+                    AppConstants.SharedTitle.CONFIRM,
                     MessageBoxButtons.YesNo,
                     MessageBoxIcon.Question
                 );
@@ -961,7 +942,7 @@ namespace StickyNoteApp
         /// </summary>
         private void Reminder10MinMenuItem_Click(object sender, EventArgs e)
         {
-            reminderManager?.SetReminderWithConfirmation(NoteId, txtNote.Text, REMINDER_TIME_10MIN);
+            reminderManager?.SetReminderWithConfirmation(NoteId, txtNote.Text, AppConstants.StickyNoteFormConfig.REMINDER_TIME_10MIN);
         }
 
         /// <summary>
@@ -969,7 +950,7 @@ namespace StickyNoteApp
         /// </summary>
         private void Reminder30MinMenuItem_Click(object sender, EventArgs e)
         {
-            reminderManager?.SetReminderWithConfirmation(NoteId, txtNote.Text, REMINDER_TIME_30MIN);
+            reminderManager?.SetReminderWithConfirmation(NoteId, txtNote.Text, AppConstants.StickyNoteFormConfig.REMINDER_TIME_30MIN);
         }
 
         /// <summary>
@@ -977,7 +958,7 @@ namespace StickyNoteApp
         /// </summary>
         private void Reminder60MinMenuItem_Click(object sender, EventArgs e)
         {
-            reminderManager?.SetReminderWithConfirmation(NoteId, txtNote.Text, REMINDER_TIME_60MIN);
+            reminderManager?.SetReminderWithConfirmation(NoteId, txtNote.Text, AppConstants.StickyNoteFormConfig.REMINDER_TIME_60MIN);
         }
 
         /// <summary>
@@ -1028,14 +1009,14 @@ namespace StickyNoteApp
             }
 
             // フォームクローズ時に最終保存
-            System.Diagnostics.Debug.WriteLine($"[{NoteId}] 最終保存実行");
+            System.Diagnostics.Debug.WriteLine(string.Format(AppConstants.StickyNoteFormMsg.MSG_FINAL_SAVE, NoteId));
             try
             {
                 SaveCurrentNoteState();
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[{NoteId}] 最終保存失敗: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine(string.Format(AppConstants.StickyNoteFormMsg.MSG_FINAL_SAVE_FAIL, NoteId, ex.Message));
                 // クローズ時のエラーは無視
             }
         }
