@@ -112,6 +112,9 @@
     <Compile Include="StickyNoteForm.Image.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Include="StickyNoteForm.ReminderMenu.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="StickyNoteForm.Resize.cs">
       <SubType>Form</SubType>
     </Compile>
