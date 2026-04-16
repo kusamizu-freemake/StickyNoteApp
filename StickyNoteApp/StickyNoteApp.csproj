@@ -106,6 +106,9 @@
     <Compile Include="ReminderManager.Designer.cs">
       <DependentUpon>ReminderManager.cs</DependentUpon>
     </Compile>
+    <Compile Include="StickyNoteForm.Image.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="StickyNoteForm.Resize.cs">
       <SubType>Form</SubType>
     </Compile>
