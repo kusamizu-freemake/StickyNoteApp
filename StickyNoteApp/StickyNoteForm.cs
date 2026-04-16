@@ -257,7 +257,6 @@ namespace StickyNoteApp
         // =========================================================
         // 以下のメソッドは今後の分割予定ファイルに移動予定
         //
-        //   StickyNoteForm.ColorMenu.cs   ← ChangeColor / SelectColor_*_Click
         //   StickyNoteForm.ReminderMenu.cs← Reminder*_Click
         //   StickyNoteForm.ContextMenu.cs ← ContextMenu_Opening / Button_Close_Click /
         //                                    StickyNoteMenu_*_Click
@@ -320,36 +319,6 @@ namespace StickyNoteApp
             imageSizeMenuItem.Visible = hasImage;
         }
 
-        /// <summary>
-        /// 色を変更する共通処理
-        /// </summary>
-        private void ChangeColor(Color color)
-        {
-            this.BackColorChanged -= BackColor_Changed;
-            this.txtNote.BackColor = color;
-            this.BackColor = color;
-            this.titleBar.BackColor = Color.WhiteSmoke;
-            this.BackColorChanged += BackColor_Changed;
-            SaveCurrentNoteState();
-        }
-
-        /// <summary>色メニュー：イエロー</summary>
-        private void SelectColor_Yellow_Click(object sender, EventArgs e) => ChangeColor(Color.Khaki);
-
-        /// <summary>色メニュー：ピンク</summary>
-        private void SelectColor_Pink_Click(object sender, EventArgs e) => ChangeColor(Color.LightPink);
-
-        /// <summary>色メニュー：ブルー</summary>
-        private void SelectColor_Blue_Click(object sender, EventArgs e) => ChangeColor(Color.LightBlue);
-
-        /// <summary>色メニュー：グリーン</summary>
-        private void SelectColor_Green_Click(object sender, EventArgs e) => ChangeColor(Color.LightGreen);
-
-        /// <summary>色メニュー：オレンジ</summary>
-        private void SelectColor_Orange_Click(object sender, EventArgs e) => ChangeColor(Color.LightSalmon);
-
-        /// <summary>色メニュー：パープル</summary>
-        private void SelectColor_Purple_Click(object sender, EventArgs e) => ChangeColor(Color.Plum);
 
         /// <summary>リマインダーメニュー：カスタム時間指定</summary>
         private void ReminderCustomMenuItem_Click(object sender, EventArgs e)
