@@ -6,17 +6,21 @@ namespace StickyNoteApp
 {
     /// <summary>
     /// グローバルホットキー管理クラス
+    /// アプリ全体で使用するホットキーの登録・解除・処理を管理する
     /// </summary>
     public class HotkeyManager
     {
-        // Windows API
+        // Windows API（グローバルホットキー登録）
         [DllImport("user32.dll")]
+        // 指定したキーの組み合わせをグローバルホットキーとしてWindowsに登録する
         private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
 
         [DllImport("user32.dll")]
+        // 登録済みのグローバルホットキーを解除し、Windowsへ返却
+        // 解除しない場合、他のアプリで同じキーが使用できなくなる場合がある
         private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
 
-        // 修飾キー
+        /// ホットキーで使う修飾キー（Ctrl・Alt・Shift・Winキー）の定数定義
         public enum KeyModifier
         {
             None = 0,
@@ -35,6 +39,7 @@ namespace StickyNoteApp
 
         /// <summary>
         /// ホットキーを登録
+        /// アプリ起動時に呼び出される
         /// </summary>
         public bool RegisterHotkeys(IntPtr handle)
         {
@@ -46,7 +51,7 @@ namespace StickyNoteApp
                 bool result1 = RegisterHotKey(
                     windowHandle,
                     AppConstants.HotkeyConfig.HOTKEY_ID_NEW_NOTE,
-                    (uint)(KeyModifier.Control | KeyModifier.Shift),
+                    (uint)(KeyModifier.Control | KeyModifier.Shift), // Ctrl+Shift
                     (uint)Keys.N
                 );
 
@@ -54,10 +59,11 @@ namespace StickyNoteApp
                 bool result2 = RegisterHotKey(
                     windowHandle,
                     AppConstants.HotkeyConfig.HOTKEY_ID_TOGGLE_NOTES,
-                    (uint)(KeyModifier.Control | KeyModifier.Shift),
+                    (uint)(KeyModifier.Control | KeyModifier.Shift), // Ctrl+Shift
                     (uint)Keys.H
                 );
 
+                // 両方の登録結果を確認してログに記録
                 if (result1 && result2)
                 {
                     System.Diagnostics.Debug.WriteLine(AppConstants.HotkeyMsg.MSG_REGISTER_SUCCESS);
@@ -65,6 +71,7 @@ namespace StickyNoteApp
                 }
                 else
                 {
+                    // 同じキーを別のアプリが先に登録している場合などに失敗
                     System.Diagnostics.Debug.WriteLine(AppConstants.HotkeyMsg.MSG_REGISTER_FAIL);
                     return false;
                 }
@@ -78,6 +85,8 @@ namespace StickyNoteApp
 
         /// <summary>
         /// ホットキーを解除
+        /// アプリ終了時に必ず呼び出す必要がある
+        /// 解除しないとキーが他アプリで使用できなくなる場合がある
         /// </summary>
         public void UnregisterHotkeys()
         {
@@ -94,7 +103,8 @@ namespace StickyNoteApp
         }
 
         /// <summary>
-        /// ホットキーが押されたときの処理
+        /// ホットキー押下時の処理振り分け
+        /// WndProc から呼び出される
         /// </summary>
         public void ProcessHotkey(int hotkeyId)
         {

@@ -364,29 +364,32 @@ namespace StickyNoteApp
         }
 
         /// <summary>
-        /// Windowsメッセージを処理（ホットキー用） 不要？なためコメントアウト ショートカットキー実装時に確認
+        /// Windowsメッセージを処理（ホットキー用）
         /// </summary>
-        //protected override void WndProc(ref Message m)
-        //{
-        //    const int WM_HOTKEY = 0x0312;
+        protected override void WndProc(ref Message m)
+        {
+            const int WM_HOTKEY = 0x0312;
 
-        //    if (m.Msg == WM_HOTKEY)
-        //    {
-        //        int hotkeyId = m.WParam.ToInt32();
-        //        hotkeyManager.ProcessHotkey(hotkeyId);
-        //    }
-
-        //    base.WndProc(ref m);
-        //}
+            if (m.Msg == WM_HOTKEY)
+            {
+                int hotkeyId = m.WParam.ToInt32();
+                HotkeyManager.ProcessHotkey(hotkeyId);
+            }
+            // 自分で処理しなかったメッセージも含め、必ず基底クラスに渡す。
+            // これを省略すると、ウィンドウの描画・移動・閉じるボタンなど Windows が本来行う処理がすべて止まってしまう。
+            base.WndProc(ref m);
+        }
 
         /// <summary>
         /// フォームクローズ時の処理
         /// </summary>
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
+            // 基底クラスの終了処理を先に実行する（省略すると正常に閉じられないことがある）。
             base.OnFormClosing(e);
 
             // ホットキーを解除
+            // 登録したままアプリを終了すると、そのキーが他のアプリでも使えなくなる場合がある。
             if (HotkeyManager != null)
             {
                 HotkeyManager.UnregisterHotkeys();
