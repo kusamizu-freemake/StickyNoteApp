@@ -22,10 +22,16 @@ namespace StickyNoteApp
         // ホットキーマネージャー
         private HotkeyManager HotkeyManager;
 
+        // アプリ設定（フォント・フォントサイズ）
+        private AppSettings _appSettings;
+
         // 常駐開始
         public TrayManagerForm()
         {
             InitializeComponent(); // フォームデザイナーで設定したUI要素の初期化
+
+            // アプリ設定を読み込む
+            _appSettings = AppSettings.Load();
 
             InitializeTray(); // トレイアイコン初期化
 
@@ -183,6 +189,9 @@ namespace StickyNoteApp
                         allNotes.Remove(note);
                     };
 
+                    // フォント設定を適用してから表示
+                    ApplySettingsToNote(note, _appSettings);
+
                     // 付箋を表示
                     note.Show();
                 }
@@ -228,12 +237,11 @@ namespace StickyNoteApp
                 allNotes.Remove(note);
             };
 
+            // フォント設定を適用してから表示
+            ApplySettingsToNote(note, _appSettings);
+
             note.Show();
         }
-
-        /// <summary>
-        /// すべての付箋を表示 / 非表示
-        /// </summary>
         private void OnShowHideAllStickyNotesClicked(object sender, EventArgs e)
         {
             // 閉じられた付箋をリストから削除
@@ -325,13 +333,58 @@ namespace StickyNoteApp
         /// <summary>
         /// 設定（未実装）
         /// </summary>
+        /// <summary>
+        /// 設定画面を開く
+        /// </summary>
         private void OnSettingClicked(object sender, EventArgs e)
         {
-            MessageBox.Show(
-                AppConstants.TrayManagerMsg.MSG_SETTING_NOT_READY,
-                AppConstants.TrayManagerTitle.TITLE_SETTINGS,
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Information);
+            using (var form = new SettingsForm(_appSettings))
+            {
+                if (form.ShowDialog() == DialogResult.OK)
+                {
+                    _appSettings = form.GetSettings();
+                    _appSettings.Save();
+
+                    // 開いている全付箋に即時反映
+                    ApplySettingsToAllNotes(_appSettings);
+
+                    System.Diagnostics.Debug.WriteLine(AppConstants.SettingsMsg.MSG_APPLY_ALL);
+                }
+            }
+        }
+
+        /// <summary>
+        /// 1つの付箋にフォント設定を適用する
+        /// </summary>
+        private void ApplySettingsToNote(StickyNoteForm note, AppSettings settings)
+        {
+            if (note == null || note.IsDisposed) return;
+
+            try
+            {
+                note.txtNote.Font = new System.Drawing.Font(
+                    settings.FontFamily,
+                    settings.FontSize
+                );
+            }
+            catch
+            {
+                // 無効なフォント名の場合はデフォルトにフォールバック
+                note.txtNote.Font = new System.Drawing.Font(
+                    AppConstants.SettingsConfig.DEFAULT_FONT_FAMILY,
+                    AppConstants.SettingsConfig.DEFAULT_FONT_SIZE
+                );
+            }
+        }
+
+        /// <summary>
+        /// 開いている全付箋にフォント設定を適用する（設定変更時に呼ぶ）
+        /// </summary>
+        private void ApplySettingsToAllNotes(AppSettings settings)
+        {
+            allNotes.RemoveAll(n => n.IsDisposed);
+            foreach (var note in allNotes)
+                ApplySettingsToNote(note, settings);
         }
 
         /// <summary>
