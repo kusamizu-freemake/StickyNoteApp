@@ -397,5 +397,43 @@ namespace StickyNoteApp
             public const int TRAY_BALLOON_TIP_DURATION = 2000;
             public const int TRAY_BALLOON_TIP_DURATION_SHORT = 1000;
         }
+
+        // AppSettings.cs / SettingsForm.cs
+        public static class SettingsConfig
+        {
+            // ファイル名
+            public const string SETTINGS_FILE_NAME = "settings.json";
+
+            // フォントデフォルト値
+            public const string DEFAULT_FONT_FAMILY = "メイリオ";
+            public const float DEFAULT_FONT_SIZE = 11f;
+
+            // フォントサイズの許容範囲
+            public const float FONT_SIZE_MIN = 8f;
+            public const float FONT_SIZE_MAX = 24f;
+        }
+
+        public static class SettingsLabel
+        {
+            // SettingsForm の UI 文字列
+            public const string TITLE_SETTINGS = "設定";
+            public const string LABEL_FONT = "フォント";
+            public const string LABEL_FONT_SIZE = "フォントサイズ";
+            public const string BTN_FONT_SELECT = "フォントを選択...";
+            public const string BTN_OK = "OK";
+            public const string BTN_CANCEL = "キャンセル";
+            public const string PREVIEW_TEXT = "付箋アプリのサンプルテキスト";
+            public const string LABEL_PREVIEW = "プレビュー";
+        }
+
+        public static class SettingsMsg
+        {
+            public const string MSG_SAVE_SUCCESS = "[AppSettings] 設定を保存しました";
+            public const string MSG_SAVE_ERROR = "[AppSettings] 設定の保存に失敗しました: {0}";
+            public const string MSG_LOAD_SUCCESS = "[AppSettings] 設定を読み込みました";
+            public const string MSG_LOAD_ERROR = "[AppSettings] 設定の読み込みに失敗しました（デフォルト使用）: {0}";
+            public const string MSG_FILE_NOT_FOUND = "[AppSettings] 設定ファイルが存在しません。デフォルト値を使用します";
+            public const string MSG_APPLY_ALL = "[AppSettings] 全付箋に設定を適用しました";
+        }
     }
 }
