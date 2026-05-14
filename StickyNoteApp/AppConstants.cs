@@ -382,6 +382,7 @@ namespace StickyNoteApp
             public const string MSG_MENU_SHORTCUT_NEW_NOTE = "Ctrl+Shift+N";
             public const string MSG_MENU_SHORTCUT_TOGGLE = "Ctrl+Shift+H";
             public const string MSG_SETTING_NOT_READY = "設定画面は準備中です。";
+            public const string MSG_MENU_SEARCH = "検索";
         }
 
         public static class TrayManagerTitle
@@ -435,5 +436,73 @@ namespace StickyNoteApp
             public const string MSG_FILE_NOT_FOUND = "[AppSettings] 設定ファイルが存在しません。デフォルト値を使用します";
             public const string MSG_APPLY_ALL = "[AppSettings] 全付箋に設定を適用しました";
         }
+
+        // SearchForm.cs / NoteSearcher.cs
+        /// <summary>
+        /// 検索ダイアログの UI 文字列
+        /// </summary>
+        public static class SearchLabel
+        {
+            public const string FORM_TITLE = "検索";
+            public const string LABEL_SEARCH_WORD = "検索文字(N):";
+            public const string BTN_SEARCH = "検索(F)";
+            public const string BTN_CLOSE = "閉じる";
+            public const string CHK_MATCH_CASE = "大小文字の区別(C)";
+            public const string CHK_WHOLE_WORD = "完全一致(E)";
+            public const string GRP_RESULTS = "検索結果";
+        }
+
+        /// <summary>
+        /// 検索ダイアログ・NoteSearcherのメッセージ文字列
+        /// </summary> 
+        public static class SearchMsg
+        {
+            // SearchForm用
+            public const string MSG_EMPTY_KEYWORD = "検索文字を入力してください。";
+            public const string MSG_NO_RESULTS = "一致する付箋が見つかりませんでした。";
+            public const string MSG_NO_RESULTS_ITEM = "(検索結果なし)";
+            
+            // SearchForm・NoteSearcher共用
+            // {0} = 件数
+            public const string MSG_RESULT_COUNT = "{0}件見つかりました";
+            
+            // NoteSearcher用(Debug.WriteLine)
+            // {0} = 例外メッセージ
+            public const string MSG_SEARCH_ERROR = "検索中にエラーが発生しました:{0}";
+
+            // 検索後に付箋が閉じられていた場合に表示する
+            public const string MSG_NOTE_NOT_FOUND = "該当する付箋が見つかりませんでした。\n既に閉じられている可能性があります。";
+        }
+
+        ///<summary>
+        /// 検索機能の動作設定値
+        ///</summary>
+        public static class SearchConfig
+        {
+            // 検索履歴の最大保持件数
+            public const int HISTORY_MAX_COUNT = 10;
+
+            // 結果一覧に表示するプレビュー文字数
+            public const int PREVIEW_MAX_LENGTH = 40;
+
+            ///<summary>
+            /// 結果一覧に表示する作成日時の文字数
+            /// "yyyy-MM-dd HH:mm" = 16文字
+            ///</summary>
+            public const int DATE_DISPLAY_LENGTH = 16;
+
+            ///<summary>
+            /// 結果一覧の表示フォーマット
+            /// {0} = 日時, {1} = プレビューテキスト
+            ///</summary>
+            public const string RESULT_FORMAT = "{0} | {1}";
+
+            // プレビュー文字列が最大長を超えた場合に付加する省略記号
+            public const string PREVIEW_ELLIPSIS = "...";
+
+            // タスクトレイ右クリックメニューの検索項目ラベル
+            public const string MENU_SEARCH = "検索";
+        }
+
     }
 }
