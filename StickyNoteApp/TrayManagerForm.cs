@@ -15,6 +15,10 @@ namespace StickyNoteApp
         private ContextMenuStrip TrayMenu; // トレイメニュー
         private ToolStripMenuItem ToggleAllNotesMenuItem; // すべての付箋表示/非表示メニュー
 
+        // 検索メニュー項目・ダイアログインスタンス
+        private ToolStripMenuItem SearchMenuItem; // 検索メニュー項目
+        private SearchForm SearchFormInstance; // 二重起動防止のためフィールドで保持
+
         // 全付箋を追跡するリスト
         private List<StickyNoteForm> allNotes = new List<StickyNoteForm>();
         private bool allNotesVisible = true;
@@ -52,21 +56,33 @@ namespace StickyNoteApp
             TrayMenu = new ContextMenuStrip();
 
             // メニュー項目にショートカットキーを表示
+            // 新しい付箋を作成
             var NewNoteItem = new ToolStripMenuItem(AppConstants.TrayManagerMsg.MSG_MENU_NEW_NOTE);
             NewNoteItem.ShortcutKeyDisplayString = AppConstants.TrayManagerMsg.MSG_MENU_SHORTCUT_NEW_NOTE;
             NewNoteItem.Click += OnCreateNoteClicked;
             TrayMenu.Items.Add(NewNoteItem);
 
+            // すべての付箋を表示/非表示
             ToggleAllNotesMenuItem = new ToolStripMenuItem(AppConstants.TrayManagerMsg.MSG_MENU_HIDE_ALL_NOTES);
             ToggleAllNotesMenuItem.ShortcutKeyDisplayString = AppConstants.TrayManagerMsg.MSG_MENU_SHORTCUT_TOGGLE;
             ToggleAllNotesMenuItem.Click += OnShowHideAllStickyNotesClicked;
             TrayMenu.Items.Add(ToggleAllNotesMenuItem);
 
+            // -------  区切り線  -------
+            TrayMenu.Items.Add(new ToolStripSeparator());
+
+            // 検索
+            SearchMenuItem = new ToolStripMenuItem(AppConstants.TrayManagerMsg.MSG_MENU_SEARCH);
+            SearchMenuItem.Click += OnSearchClicked;
+            TrayMenu.Items.Add(SearchMenuItem);
+
+
             // DB整合性チェック（デバッグ用。完成間際で削除予定）
             TrayMenu.Items.Add(new ToolStripSeparator()); // 区切り線
             TrayMenu.Items.Add(AppConstants.TrayManagerMsg.MSG_MENU_DB_INTEGRITY_CHECK, null, OnDatabaseIntegrityCheckClicked);
+ 
 
-            // 設定（未実装）
+            // 設定
             TrayMenu.Items.Add(AppConstants.TrayManagerMsg.MSG_MENU_SETTINGS, null, OnSettingClicked);
             TrayMenu.Items.Add(new ToolStripSeparator()); // 区切り線
             TrayMenu.Items.Add(AppConstants.TrayManagerMsg.MSG_MENU_EXIT, null, OnExitClicked);
@@ -269,6 +285,67 @@ namespace StickyNoteApp
             }
         }
 
+        // =============================================
+        // 検索
+        // =============================================
+
+        ///<summary>
+        /// 検索メニュークリック
+        /// 既にSearchFormが開いている場合は前面に出す(二重起動防止)
+        ///</summary>
+        private void OnSearchClicked(object sender, EventArgs e)
+        {
+            // 既存インスタンスが生きていれば前面に出す
+            if(SearchFormInstance != null && !SearchFormInstance.IsDisposed)
+            {
+                SearchFormInstance.BringToFront();
+                SearchFormInstance.Activate();
+                return;
+            }
+
+            // 新規インスタンスを生成し、フォーカス用コールバックを注入
+            SearchFormInstance = new SearchForm();
+            SearchFormInstance.FocusNoteCallback = FocusNoteByNoteId;
+
+            // フォームが閉じられたらインスタンスを解放
+            SearchFormInstance.FormClosed += (S, Args) =>
+            {
+                SearchFormInstance.Dispose();
+                SearchFormInstance = null;
+            };
+
+            SearchFormInstance.Show();
+        }
+
+        ///<summary>
+        /// NoteIdを受け取り、該当する付箋を前面に表示する
+        /// 非表示の付箋も含めて allNotes を検索し、見つかった付箋を前面にアクティブ表示する
+        /// 見つからない場合（付箋が閉じられているなど）は何もしない
+        /// </summary>
+        private void FocusNoteByNoteId(string NoteId)
+        {
+            // 破棄済みの付箋をリストから除去
+            allNotes.RemoveAll(N => N.IsDisposed);
+
+            foreach(StickyNoteForm Note in allNotes)
+            {
+                if (Note.NoteId != NoteId) continue;
+
+                // 非表示（すべて非表示モード中など）の場合も表示状態に戻す
+                if (!Note.Visible) Note.Show();
+
+                Note.BringToFront();
+                Note.Activate();
+                return;
+            }
+            // 該当付箋が見つからない場合（既に閉じられているなど）はメッセージを表示
+            MessageBox.Show(
+                AppConstants.SearchMsg.MSG_NOTE_NOT_FOUND,
+                AppConstants.SharedTitle.INFO,
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
+        }
+
         /// <summary>
         /// データベース整合性チェック
         /// </summary>
@@ -331,7 +408,7 @@ namespace StickyNoteApp
         }
 
         /// <summary>
-        /// 設定（未実装）
+        /// 設定
         /// </summary>
         /// <summary>
         /// 設定画面を開く

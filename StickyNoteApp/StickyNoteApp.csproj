@@ -119,14 +119,23 @@
     <Compile Include="ImageManager.cs" />
     <Compile Include="ImageResizeManager.cs" />
     <Compile Include="ImageResizer.cs" />
+    <Compile Include="Notesearcher.cs" />
     <Compile Include="ReminderManager.cs" />
     <Compile Include="ReminderManager.Designer.cs">
       <DependentUpon>ReminderManager.cs</DependentUpon>
     </Compile>
+    <Compile Include="SearchForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="SearchForm.Designer.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Searchoptions.cs" />
+    <Compile Include="SearchResultItem.cs" />
     <Compile Include="SettingsForm.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="SettingsForm_Designer.cs">
+    <Compile Include="SettingsForm.Designer.cs">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="StickyNoteForm.ColorMenu.cs">
